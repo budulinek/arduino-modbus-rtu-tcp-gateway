@@ -18,10 +18,10 @@ Transparent gateway Modbus RTU &lt;---> Modbus TCP / Modbus UDP for Arduino
   * requests to responding slaves are processed first
 
 ## Connections
-  Arduino <-> MAX485
-  Tx1 <-> DI
-  Rx0 <-> RO
-  Pin 6 <-> DE,RE
+  Arduino - MAX485
+  Tx1 - DI
+  Rx0 - RO
+  Pin 6 - DE,RE
   
 ## Settings
 * RS485 settings
