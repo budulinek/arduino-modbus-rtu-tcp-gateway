@@ -7,7 +7,8 @@ Transparent gateway Modbus RTU &lt;---> Modbus TCP / Modbus UDP for Arduino
 * MAX485 (or other RS485 TTL module)
 
 ## Features
-* slaves are on the Modbus RTU side, masters are on the Modbus TCP or Modbus UDP side
+* slaves are on RS485 line (Modbus RTU protocol)
+* master(s) are on ethernet (Modbus TCP or Modbus UDP protocol)
 * supports up to 247 Modbus RTU slaves
 * supports Modbus UDP masters and up to 8 Modbus TCP masters connected at the same time
 * supports broadcast (slave address 0x00)
