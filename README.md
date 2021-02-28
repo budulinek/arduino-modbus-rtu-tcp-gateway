@@ -1,5 +1,5 @@
-# Arduino-Modbus-RTU---Modbus-TCP-UDP-Gateway
-Transparent gateway Modbus RTU &lt;---> Modbus TCP / Modbus UDP for Arduino
+# arduino-modbus-tcp-rtu-gateway
+Arduino-based Modbus TCP/UDP (master) to Modbus RTU (slaves) gateway.
 
 ## Hardware
 * Arduino (Nano, Uno, possibly other)
