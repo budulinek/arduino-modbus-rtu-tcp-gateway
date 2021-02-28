@@ -1,4 +1,4 @@
-/* Transparent gateway Modbus RTU <---> Modbus TCP / Modbus UDP 
+/* Arduino-based Modbus TCP/UDP (master) to Modbus RTU (slaves) gateway. 
    - supports up to 247 Modbus RTU slaves
    - supports Modbus UDP masters and up to 8 Modbus TCP masters connected at the same time
    - supports broadcast (slave address 0x00) and error codes
