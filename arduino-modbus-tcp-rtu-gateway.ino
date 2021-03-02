@@ -20,8 +20,10 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
-#include <CircularBuffer.h>
-#include <BitBool.h>
+#include <CircularBuffer.h>     // CircularBuffer https://github.com/rlogiacco/CircularBuffer
+#include <BitBool.h>        // BitBool https://github.com/Chris--A/BitBool
+#include <TrueRandom.h>         // https://github.com/sirleech/TrueRandom
+#include <EEPROM.h>
 
 // RS485 settings
 #define BAUD 9600
@@ -31,7 +33,7 @@
 #define MAX_RETRY 5                          // maximum number of retries for sending Modbus RTU request
 
 // TCP and UDP settings
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED  };     // MAC - change to something more random...
+
 IPAddress ip(192, 168, 1, 10);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
@@ -50,7 +52,8 @@ IPAddress subnet(255, 255, 255, 0);
 #define SerialTxControl 6           // Arduino Pin for RS485 Direction control
 #define ethResetPin      7          // OPTIONAL: Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
 
-
+// App will generate unique MAC address, bytes 4, 5 and 6 will hold random value
+byte mac[6] = { 0x90, 0xA2, 0xDA, 0x00, 0x00, 0x00 };
 #define UDP_TX_PACKET_MAX_SIZE BUFFER_SIZE
 
 typedef struct {
@@ -104,11 +107,10 @@ class MicroTimer {
 };
 
 boolean MicroTimer::isOver() {
-  if (micros() - timestampLastHitMs < sleepTimeMs) {
-    return false;
+  if ((unsigned long)(micros() - timestampLastHitMs) > sleepTimeMs) {
+    return true;
   }
-  timestampLastHitMs = micros();
-  return true;
+  return false;
 }
 
 void MicroTimer::start(unsigned long sleepTimeMs) {
@@ -126,11 +128,10 @@ class Timer {
 };
 
 boolean Timer::isOver() {
-  if (millis() - timestampLastHitMs < sleepTimeMs) {
-    return false;
+  if ((unsigned long)(millis() - timestampLastHitMs) > sleepTimeMs) {
+    return true;
   }
-  timestampLastHitMs = millis();
-  return true;
+  return false;
 }
 
 void Timer::start(unsigned long sleepTimeMs) {
@@ -160,8 +161,21 @@ void setup()   /****** SETUP: RUNS ONCE ******/
   digitalWrite(ethResetPin, HIGH);
   delay(500);
   pinMode(ethResetPin, INPUT);
-  delay(500);
+  delay(1000);
 #endif
+  // MAC stored in EEPROM
+  if (EEPROM.read(1) == '#') {
+    for (int i = 3; i < 6; i++)
+      mac[i] = EEPROM.read(i);
+  }
+  // MAC not set, generate random value
+  else {
+    for (int i = 3; i < 6; i++) {
+      mac[i] = TrueRandom.randomByte();
+      EEPROM.write(i, mac[i]);
+    }
+    EEPROM.write(1, '#');
+  }
 
   Ethernet.begin(mac, ip);
   Ethernet.setRetransmissionTimeout(20);          // speed up ethernet
@@ -386,7 +400,7 @@ void processUdpTcp()
 
 void sendSerial()
 {
-  if (sendingData == true) {
+  if (sendingData == true && txDelay.isOver() && !rxNdx) {        // avoid bus collision, only send when we are not receiving data
     if (Serial.availableForWrite() > 0 && txNdx == 0 && digitalRead(SerialTxControl) == RS485Receive) {
       digitalWrite(SerialTxControl, RS485Transmit);           // Enable RS485 Transmit
       crc = 0xFFFF;
