@@ -26,19 +26,19 @@ Screenshots of the web interface:
 * up to 247 Modbus RTU slaves
 * up to 8 TCP/UDP sockets for Modbus TCP/UDP masters and for the web interface
 * RS485 interface protocols:
-  o Modbus RTU
+  - Modbus RTU
 * Ethernet interface protocols:
-  o Modbus TCP
-  o Modbus UDP
-  o Modbus RTU over TCP
-  o Modbus RTU over UDP
+  - Modbus TCP
+  - Modbus UDP
+  - Modbus RTU over TCP
+  - Modbus RTU over UDP
 * supports broadcast (slave address 0x00) and error codes
 * supports all Modbus function codes
 * settings can be changed via web interface, stored in EEPROM
 * diagnostics and Modbus RTU scan via web interface
 * optimized queue for Modbus requests
-  o prioritization of requests to responding slaves
-  o queue will accept only one requests to non-responding slaves
+  - prioritization of requests to responding slaves
+  - queue will accept only one requests to non-responding slaves
 
 ## How can I build it myself?
 Get the hardware. Cheap clones from China are sufficient:
