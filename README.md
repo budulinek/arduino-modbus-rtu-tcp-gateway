@@ -9,27 +9,36 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 Screenshots of the web interface:
 
+<img src="/pics/modbus1.png" alt="01" style="zoom:100%;" />
 
+<img src="/pics/modbus2.png" alt="02" style="zoom:100%;" />
+
+<img src="/pics/modbus3.png" alt="03" style="zoom:100%;" />
+
+<img src="/pics/modbus4.png" alt="04" style="zoom:100%;" />
+
+<img src="/pics/modbus5.png" alt="05" style="zoom:100%;" />
 
 ## What are the technical specifications?
+
 * slaves are connected via RS485 interface
-   - master(s) are connected via ethernet interface
-   - up to 247 Modbus RTU slaves
-   - up to 8 TCP/UDP sockets for Modbus TCP/UDP masters and for the web interface
-   - RS485 interface protocols:
-              * Modbus RTU
-   - Ethernet interface protocols:
-              * Modbus TCP
-              * Modbus UDP
-              * Modbus RTU over TCP
-              * Modbus RTU over UDP
-   - supports broadcast (slave address 0x00) and error codes
-   - supports all Modbus function codes
-   - settings can be changed via web interface, stored in EEPROM
-   - diagnostics and Modbus RTU scan via web interface
-   - optimized queue for Modbus requests
-            o prioritization of requests to responding slaves
-            o queue will accept only one requests to non-responding slaves
+* master(s) are connected via ethernet interface
+* up to 247 Modbus RTU slaves
+* up to 8 TCP/UDP sockets for Modbus TCP/UDP masters and for the web interface
+* RS485 interface protocols:
+  o Modbus RTU
+* Ethernet interface protocols:
+  o Modbus TCP
+  o Modbus UDP
+  o Modbus RTU over TCP
+  o Modbus RTU over UDP
+* supports broadcast (slave address 0x00) and error codes
+* supports all Modbus function codes
+* settings can be changed via web interface, stored in EEPROM
+* diagnostics and Modbus RTU scan via web interface
+* optimized queue for Modbus requests
+  o prioritization of requests to responding slaves
+  o queue will accept only one requests to non-responding slaves
 
 ## How can I build it myself?
 Get the hardware. Cheap clones from China are sufficient:
@@ -75,3 +84,5 @@ Big thanks to the authors of these libraries and tutorials!
 This project started as a simple "playground" where I learned things. However, it evolved into more serious project: Modbus gateway in full compliance with Modbus standards. Later on, web interface was added as a demonstration of what a simple Arduino Nano is capable of. 
 
 Not everything could fit into the limited flash memory of Arduino Nano / Uno. The DHCP client within a ethernet library consumes too much memory. The code for automatic IP address is in the sketch but disabled by default. If you want to use auto IP functionality, you have to use something bigger (such as Arduino Mega) and uncomment #define ENABLE_DHCP. After that, new "Auto IP" setting will appear in the IP settings web interface.
+
+<img src="/pics/modbus6.png" alt="06" style="zoom:100%;" />
