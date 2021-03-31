@@ -43,11 +43,11 @@ Screenshots of the web interface:
 ## How can I build it myself?
 Get the hardware. Cheap clones from China are sufficient:
 
-* Arduino (Nano, Uno, possibly other)
-* W5500-based Ethernet shield (for Nano, I recommend W5500 Ethernet Shield from RobotDyn)
+* Arduino Nano, Uno or Mega (and possibly other)
+* W5100, W5200 or W5500 based Ethernet shield (for Nano, I recommend W5500 Ethernet Shield from RobotDyn)
 * MAX485 module
 
-Connect the hardware:
+Connect the hardware (on Nano and Uno, the sketch uses HW Serial, on Mega you have to configure Serial in ADVANCED SETTINGS in the sketch):
 
 * Arduino <-> MAX485
 
@@ -57,7 +57,7 @@ Connect the hardware:
 
 * Pin 6 <-> DE,RE
 
-Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (some of them are available in "library manager", other have to be manually downloaded from github). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
+Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (both are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
 
 ## Where can I learn more about Modbus protocols?
 
@@ -74,15 +74,32 @@ The key to success is:
 
 * use StreamLib https://github.com/jandrassy/StreamLib
 * use F macros for your HTML code
-* for W5500 ethernet modules, use Ethernet3 https://github.com/sstaub/Ethernet3
+* use for() loop for repetitive code
 * use POST method (rather than GET) for your webforms, see this tutorial https://werner.rothschopf.net/202003_arduino_webserver_post_en.htm
 
 Big thanks to the authors of these libraries and tutorials!
 
-## Background
+## Limitations
 
-This project started as a simple "playground" where I learned things. However, it evolved into more serious project: Modbus gateway in full compliance with Modbus standards. Later on, web interface was added as a demonstration of what a simple Arduino Nano is capable of. 
+#### Portability
 
-Not everything could fit into the limited flash memory of Arduino Nano / Uno. The DHCP client within a ethernet library consumes too much memory. The code for automatic IP address is in the sketch but disabled by default. If you want to use auto IP functionality, you have to use something bigger (such as Arduino Mega) and uncomment #define ENABLE_DHCP. After that, new "Auto IP" setting will appear in the IP settings web interface.
+The code was tested on Arduino Nano, Uno and Mega, ethernet chips W5100 and W5500. It may work on other platforms, but:
+
+* The pseudorandom generator (for random MAC) is seeded through watch dog timer interrupt - this will work only on Arduino (credits to https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed)
+* The restart function will also work only on Arduino.
+
+#### Ethernet socket
+
+The default Ethernet.h library determines MAX_SOCK_NUM by microcontroller RAM (not by Ethernet chip type). So if you use W5500 (which has 8 sockets available) on Arduino Nano, only 4 sockets will be used. If you want to force the library to use 8 sockets, edit https://github.com/arduino-libraries/Ethernet/blob/master/src/Ethernet.h#L36 
+
+#### Memory
+
+Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra features in the main sketch by uncommenting:
+
+* #define ENABLE_DHCP will allow you to set "Auto IP" via DHCP in the IP settings web interface. Leased IP is automatically renewed.
 
 <img src="/pics/modbus6.png" alt="06" style="zoom:100%;" />
+
+* #define ENABLE_EXTRA_DIAG  shows extra info on "Current status" page: per socket diagnostics, run time counter.
+
+<img src="/pics/modbus1x.png" alt="01x" style="zoom:100%;" />

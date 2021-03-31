@@ -27,26 +27,26 @@ MicroTimer txDelay;
 void sendSerial()
 {
   if (serialState == SENDING && rxNdx == 0) {        // avoid bus collision, only send when we are not receiving data
-    if (Serial.availableForWrite() > 0 && txNdx == 0 && digitalRead(SerialTxControl) == RS485Receive) {
-      digitalWrite(SerialTxControl, RS485Transmit);           // Enable RS485 Transmit
+    if (mySerial.availableForWrite() > 0 && txNdx == 0 && digitalRead(rs485ControlPin) == RS485_RECEIVE) {
+      digitalWrite(rs485ControlPin, RS485_TRANSMIT);           // Enable RS485 Transmit
       crc = 0xFFFF;
-      Serial.write(queueHeaders.first().uid);        // send uid (address)
+      mySerial.write(queueHeaders.first().uid);        // send uid (address)
       calculateCRC(queueHeaders.first().uid);
     }
-    while (Serial.availableForWrite() > 0 && txNdx < queueHeaders.first().PDUlen && digitalRead(SerialTxControl) == RS485Transmit) {
-      Serial.write(queuePDUs[txNdx]);                // send func and data
+    while (mySerial.availableForWrite() > 0 && txNdx < queueHeaders.first().PDUlen && digitalRead(rs485ControlPin) == RS485_TRANSMIT) {
+      mySerial.write(queuePDUs[txNdx]);                // send func and data
       calculateCRC(queuePDUs[txNdx]);
       txNdx++;
     }
-    if (Serial.availableForWrite() > 1 && txNdx == queueHeaders.first().PDUlen) {
+    if (mySerial.availableForWrite() > 1 && txNdx == queueHeaders.first().PDUlen) {
       // In Modbus TCP mode we must add CRC (in Modbus RTU over TCP, CRC is already in queuePDUs)
       if (!localConfig.enableRtuOverTcp || queueHeaders.first().clientNum == SCAN_REQUEST) {
-        Serial.write(lowByte(crc));                            // send CRC, low byte first
-        Serial.write(highByte(crc));
+        mySerial.write(lowByte(crc));                            // send CRC, low byte first
+        mySerial.write(highByte(crc));
       }
       txNdx++;
     }
-    if (Serial.availableForWrite() == SERIAL_TX_BUFFER_SIZE - 1 && txNdx > queueHeaders.first().PDUlen) {
+    if (mySerial.availableForWrite() == SERIAL_TX_BUFFER_SIZE - 1 && txNdx > queueHeaders.first().PDUlen) {
       // wait for last byte (incl. CRC) to be sent from serial Tx buffer
       // this if statement is not very reliable (too fast)
       // Serial.isFlushed() method is needed....see https://github.com/arduino/Arduino/pull/3737
@@ -57,7 +57,7 @@ void sendSerial()
   } else if (serialState == DELAY && txDelay.isOver()) {
     serialTxCount += queueHeaders.first().PDUlen + 1;    // in Modbus RTU over TCP, queuePDUs already contains CRC
     if (!localConfig.enableRtuOverTcp) serialTxCount += 2;  // in Modbus TCP, add 2 bytes for CRC
-    digitalWrite(SerialTxControl, RS485Receive);                                    // Disable RS485 Transmit
+    digitalWrite(rs485ControlPin, RS485_RECEIVE);                                    // Disable RS485 Transmit
     if (queueHeaders.first().uid == 0x00) {           // Modbus broadcast - we do not count attempts and delete immediatelly
       serialState = IDLE;
       deleteRequest();
@@ -72,15 +72,15 @@ void sendSerial()
 void recvSerial()
 {
   static byte serialIn[modbusSize];
-  while (Serial.available() > 0) {
+  while (mySerial.available() > 0) {
     if (rxTimeout.isOver() && rxNdx != 0) {
       rxErr = true;       // character timeout
     }
     if (rxNdx < modbusSize) {
-      serialIn[rxNdx] = Serial.read();
+      serialIn[rxNdx] = mySerial.read();
       rxNdx++;
     } else {
-      Serial.read();
+      mySerial.read();
       rxErr = true;       // frame longer than maximum allowed
     }
     rxDelay.sleep(frameDelay);
@@ -91,7 +91,7 @@ void recvSerial()
     // Process Serial data
     // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
     if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueHeaders.first().uid && serialState == WAITING) {
-      slavesResponding[serialIn[0]] = true;               // flag slave as responding
+      setSlaveResponding(serialIn[0], true);               // flag slave as responding
       byte MBAP[] = {queueHeaders.first().tid[0], queueHeaders.first().tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2)};
       if (queueHeaders.first().clientNum == UDP_REQUEST) {
         Udp.beginPacket(queueHeaders.first().remIP, queueHeaders.first().remPort);
@@ -106,7 +106,7 @@ void recvSerial()
       } else if (queueHeaders.first().clientNum != SCAN_REQUEST) {
         EthernetClient client = EthernetClient(queueHeaders.first().clientNum);
         // make sure that this is really our socket
-        if (Ethernet._server_port[queueHeaders.first().clientNum] == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
+        if (client.localPort() == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
           if (localConfig.enableRtuOverTcp) client.write(serialIn, rxNdx);
           else {
             client.write(MBAP, 6);
@@ -127,11 +127,11 @@ void recvSerial()
 
   // Deal with Serial timeouts (i.e. Modbus RTU timeouts)
   if (serialState == WAITING && requestTimeout.isOver()) {
-    slavesResponding[queueHeaders.first().uid] = false;     // flag slave as nonresponding
+    setSlaveResponding(queueHeaders.first().uid, false);     // flag slave as nonresponding
     if (queueRetries.first() >= localConfig.serialRetry) {
       // send modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
       byte MBAP[] = {queueHeaders.first().tid[0], queueHeaders.first().tid[1], 0x00, 0x00, 0x00, 0x03};
-      byte PDU[] = {queueHeaders.first().uid, queuePDUs[0] + 0x80, 0x0B};
+      byte PDU[] = {queueHeaders.first().uid, (byte)(queuePDUs[0] + 0x80), 0x0B};
       crc = 0xFFFF;
       for (byte i = 0; i < sizeof(PDU); i++) {
         calculateCRC(PDU[i]);
@@ -152,7 +152,7 @@ void recvSerial()
       } else {
         EthernetClient client = EthernetClient(queueHeaders.first().clientNum);
         // make sure that this is really our socket
-        if (Ethernet._server_port[queueHeaders.first().clientNum] == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
+        if (client.localPort() == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
           if (!localConfig.enableRtuOverTcp) {
             client.write(MBAP, 6);
           }

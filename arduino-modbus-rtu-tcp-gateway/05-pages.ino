@@ -23,7 +23,7 @@
 
    ***************************************************************** */
 
-const uint16_t webOutBufferSize = 64;               // size of web server write buffer (used by StreamLib)
+const byte webOutBufferSize = 64;               // size of web server write buffer (used by StreamLib)
 
 void sendPage(EthernetClient &client, byte reqPage)
 {
@@ -48,7 +48,7 @@ void sendPage(EthernetClient &client, byte reqPage)
     page.print(localConfig.webPort);
   }
   page.print(F(">"
-               "<title>Modbus TCP/UDP &rArr; Modbus RTU Gateway</title>"
+               "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
                "<style>"
                "a {text-decoration:none;color:white}"
                "td:first-child {text-align:right;width:30%}"
@@ -64,7 +64,7 @@ void sendPage(EthernetClient &client, byte reqPage)
   page.print(F(">"
                "<table height=100% style='position:absolute;top:0;bottom:0;left:0;right:0'>"
                "<tr style='height:10px'><th colspan=2>"
-               "<h1 style='margin:0px'>Modbus TCP/UDP &rArr; Modbus RTU Gateway</h1>"  // first row is header
+               "<h1 style='margin:0px'>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
                "<tr>"                                           // second row is left menu (first cell) and main page (second cell)
                "<th valign=top style=width:20%;padding:0px>"
 
@@ -120,7 +120,7 @@ void sendPage(EthernetClient &client, byte reqPage)
       break;
   }
   if (reqPage >= 2 && reqPage <= 4) {
-    page.print(F("<tr><td><br><input type=submit value='Save & Apply'>  <td><br>  <input type=reset value=Cancel>"));
+    page.print(F("<tr><td><br><input type=submit value='Save & Apply'><td><br><input type=reset value=Cancel>"));
   }
   page.print(F("</table></form>"
                "</table></body></html>"));
@@ -155,27 +155,54 @@ void menuItem(ChunkedPrint& menu, byte item) {
 //        Current Status
 void contentStatus(ChunkedPrint& content)
 {
-  content.print(F("<tr><td>Microcontroller Board:<td>"));
+  content.print(F("<tr><td>Microcontroller:<td>"));
   content.print(BOARD);
-  content.print(F(""
-                  //                  "<tr><td>Ethernet Link:<td>"));
-                  //  content.print(Ethernet.duplexReport());
-                  //  content.print(F(" "));
-                  //  content.print(Ethernet.speedReport());
-                  //  content.print(F(""
-                  "<tr><td>MAC Address:<td>"));
+  content.print(F("<tr><td>Ethernet Chip:<td>"));
+  switch (Ethernet.hardwareStatus()) {
+    case EthernetW5100:
+      content.print(F("W5100"));
+      break;
+    case EthernetW5200:
+      content.print(F("W5200"));
+      break;
+    case EthernetW5500:
+      content.print(F("W5500"));
+      break;
+    default:        // TODO: add W6100 once it is included in Ethernet library
+      content.print(F("unknown"));
+      break;
+  }
+  content.print(F("<tr><td>Ethernet Sockets:<td>"));
+  content.print(maxSockNum, HEX);
+  content.print(F("<tr><td>MAC Address:<td>"));
+  byte macBuffer[6];
+  Ethernet.MACAddress(macBuffer);
   for (byte i = 0; i < 6; i++) {
-    if (localConfig.mac[i] < 16) content.print(F("0"));
-    content.print(localConfig.mac[i], HEX);
+    if (macBuffer[i] < 16) content.print(F("0"));
+    content.print(macBuffer[i], HEX);
     if (i < 5) content.print(F(":"));
   }
+
+#ifdef ENABLE_DHCP
+  content.print(F("<tr><td>Auto IP:<td>"));
+  if (!localConfig.enableDhcp) {
+    content.print(F("DHCP disabled"));
+  } else if (dhcpSuccess == true) {
+    content.print(F("DHCP successful"));
+  } else {
+    content.print(F("DHCP failed, using fallback static IP"));
+  }
+#endif /* ENABLE_DHCP */
+
   content.print(F("<tr><td>IP Address:<td>"));
   content.print(Ethernet.localIP());
+
+#ifdef ENABLE_EXTRA_DIAG
   content.print(F("<tr><td>Run Time:<td>"));
   byte mod_seconds = byte((seconds) % 60);
   byte mod_minutes = byte((seconds / 60) % 60);
   byte mod_hours = byte((seconds / (60 * 60)) % 24);
-  int days = int(seconds / (60 * 60 * 24));
+  int days = (seconds / (60U * 60U * 24));
   content.print(days);
   content.print(F(" days, "));
   content.print(mod_hours);
@@ -183,8 +210,10 @@ void contentStatus(ChunkedPrint& content)
   content.print(mod_minutes);
   content.print(F(" mins, "));
   content.print(mod_seconds);
-  content.print(F(" secs"
-                  "<tr><td>RS485 Data:<td>"));
+  content.print(F(" secs"));
+#endif /* ENABLE_EXTRA_DIAG */
+
+  content.print(F("<tr><td>RS485 Data:<td>"));
   content.print(serialTxCount);
   content.print(F(" Tx bytes / "));
   content.print(serialRxCount);
@@ -193,16 +222,18 @@ void contentStatus(ChunkedPrint& content)
   content.print(ethTxCount);
   content.print(F(" Tx bytes / "));
   content.print(ethRxCount);
-  content.print(F(" Rx bytes  (excl. WebUI)"
-                  "<tr><td colspan=2>"
+  content.print(F(" Rx bytes  (excl. WebUI)"));
+
+#ifdef ENABLE_EXTRA_DIAG
+  content.print(F("<tr><td colspan=2>"
                   "<table style=border-collapse:collapse;text-align:center>"
-                  "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>"));
-  for (byte i = 0; i < Ethernet._maxSockNum; i++) {
+                  "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
+  for (byte i = 0; i < maxSockNum ; i++) {
     EthernetClient clientDiag = EthernetClient(i);
     content.print(F("<tr><td>Socket "));
     content.print(i);
     content.print(F(":<td>"));
-    switch (clientDiag.getSocketMode()) {
+    switch (W5100.readSnMR(i)) {
       case SnMR::CLOSE:
         content.print(F("CLOSE"));
         break;
@@ -281,38 +312,50 @@ void contentStatus(ChunkedPrint& content)
         break;
     }
     content.print(F("<td>"));
-    if (clientDiag.getSocketMode() == SnMR::UDP) {
-      content.print(localConfig.udpPort);
-    } else {
-      content.print(Ethernet._server_port[i]);
-    }
+    content.print(clientDiag.localPort());
     content.print(F("<td>"));
-    byte remIp[4];
-    clientDiag.remoteIP(remIp);
-    for (byte j = 0; j < 4; j++) {
-      content.print(remIp[j]);
-      if (j < 3) {
-        content.print(F("."));
+    content.print(clientDiag.remoteIP());
+    content.print(F("<td>"));
+    content.print(clientDiag.remotePort());
+  }
+  content.print(F("</table>"));
+#endif /* ENABLE_EXTRA_DIAG */
+
+  content.print(F("<tr><td><br>"
+                  "<tr><td>Modbus TCP/UDP Masters:"));
+  byte countMasters = 0;
+  for (byte i = 0; i < maxSockNum; i++) {
+    EthernetClient clientDiag = EthernetClient(i);
+    IPAddress ipTemp = clientDiag.remoteIP();
+    if (ipTemp != 0 && ipTemp != 0xFFFFFFFF) {
+      if (clientDiag.status() == SnSR::UDP && clientDiag.localPort() == localConfig.udpPort) {
+        content.print(F("<td><tr><td>UDP:<td>"));
+        content.print(ipTemp);
+        countMasters++;
+      } else if (clientDiag.localPort() == localConfig.tcpPort) {
+        content.print(F("<td><tr><td>TCP:<td>"));
+        content.print(ipTemp);
+        countMasters++;
       }
     }
   }
-  content.print(F("</table>"
-                  "<tr><td><br>"
-                  "<tr><td>Modbus RTU Slaves:<td><button name=a value=7>Scan</button>"));
+  if (countMasters == 0) content.print(F("<td>none"));
+  content.print(F("<tr><td><br>"
+                  "<tr><td>Modbus RTU Slaves:<td><button name=a value=6>Scan</button>"));  // value=6 must correspond to enum action = SCAN
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
-    if (slavesResponding[k] || k == scanCounter) {
+    if (getSlaveResponding(k) == true || k == scanCounter) {
       content.print(F("<tr><td><td>0x"));
       if (k < 16) content.print(F("0"));
       content.print(k, HEX);
-      if (slavesResponding[k]) {
-        content.print(F(" OK responding"));
+      if (getSlaveResponding(k) == true) {
+        content.print(F(" OK"));
         countSlaves++;
       }
-      else content.print(F(" waiting for response..."));
+      else content.print(F(" waiting..."));
     }
   }
-  if (countSlaves == 0 && scanCounter == 0) content.print(F("<tr><td><td>no slaves found"));
+  if (countSlaves == 0 && scanCounter == 0) content.print(F("<tr><td><td>none"));
 }
 
 
@@ -374,22 +417,42 @@ void contentIp(ChunkedPrint& content)
 //            TCP/UDP Settings
 void contentTcp(ChunkedPrint& content)
 {
-  content.print(F("<tr><td>Modbus TCP Port:"));
-  helperInput(content);
-  content.print(F("t1 min=1 max=65535 value="));
-  content.print(localConfig.tcpPort);
-  content.print(F(">"
-                  "<tr><td>Modbus UDP Port:"));
-  helperInput(content);
-  content.print(F("t2 min=1 max=65535 value="));
-  content.print(localConfig.udpPort);
-  content.print(F(">"
-                  "<tr><td>Web Interface Port:"));
-  helperInput(content);
-  content.print(F("t3 min=1 max=65535 value="));
-  content.print(localConfig.webPort);
-  content.print(F(">"
-                  "<tr><td>Modbus Mode:<td><select name=t4>"));
+  for (byte i = 0; i < 3; i++) {
+    content.print(F("<tr><td>"));
+    switch (i) {
+      case 0:
+        content.print(F("Modbus TCP"));
+        break;
+      case 1:
+        content.print(F("Modbus UDP"));
+        break;
+      case 2:
+        content.print(F("Web"));
+        break;
+      default:
+        break;
+    }
+    content.print(F(" Port:"));
+    helperInput(content);
+    content.print(F("t"));
+    content.print(i + 1);
+    content.print(F("min=1 max=65535 value="));
+    switch (i) {
+      case 0:
+        content.print(localConfig.tcpPort);
+        break;
+      case 1:
+        content.print(localConfig.udpPort);
+        break;
+      case 2:
+        content.print(localConfig.webPort);
+        break;
+      default:
+        break;
+    }
+    content.print(F(">"));
+  }
+  content.print(F("<tr><td>Modbus Mode:<td><select name=t4>"));
   for (byte i = 0; i < 2; i++) {
     content.print(F("<option value="));
     content.print(i);
@@ -477,16 +540,11 @@ void contentRtu(ChunkedPrint& content)
 //        Tools
 void contentTools(ChunkedPrint& content)
 {
-  content.print(F("<tr><td>Factory Defaults:<td><button name=a value=1>Restore</button> (DHCP: "));
-  if (defaultConfig.enableDhcp) content.print(F("Enabled"));
-  else content.print(F("Disabled"));
-  content.print(F(", Static IP: "));
+  content.print(F("<tr><td>Factory Defaults:<td><button name=a value=1>Restore</button> (Static IP: "));
   content.print(defaultConfig.ip);
   content.print(F(")"
                   "<tr><td>MAC Address: <td><button name=a value=2>Generate New</button>"
-                  "<tr><td>Ethernet Interface: <td><button name=a value=3>Soft Restart</button>  <button name=a value=4>Hard Restart</button>"
-                  "<tr><td>RS485 Interface: <td><button name=a value=5>Soft Restart</button>"
-                  "<tr><td>Microcontroller: <td><button name=a value=6>Reboot</button>"));
+                  "<tr><td>Microcontroller: <td><button name=a value=3>Reboot</button>"));
 }
 
 void contentWait(ChunkedPrint& content)

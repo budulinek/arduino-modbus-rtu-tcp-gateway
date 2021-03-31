@@ -13,18 +13,29 @@
    resetFunc
    - well... resets Arduino
 
+   maintainDhcp()
+   - maintain DHCP lease
+   
    maintainUptime
    - maintains up time in case of millis() overflow
 
    maintainCounters
    - synchronizes roll-over of data counters to zero
 
+   CreateTrulyRandomSeed
+   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
+   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+
+   generateMac()
+   - generate random MAC using pseudo random generator (faster and than build-in random())
+
    + preprocessor code for identifying microcontroller board
 
    ***************************************************************** */
 
+
 void startSerial() {
-  Serial.begin(localConfig.baud, localConfig.serialConfig);
+  mySerial.begin(localConfig.baud, localConfig.serialConfig);
   // Calculate Modbus RTU character timeout and frame delay
   byte bits =                                         // number of bits per character (11 in default Modbus RTU settings)
     1 +                                               // start bit
@@ -40,30 +51,55 @@ void startSerial() {
     charTimeout = 750;
     frameDelay = 1750;
   }
-  pinMode(SerialTxControl, OUTPUT);
-  digitalWrite(SerialTxControl, RS485Receive);  // Init Transceiver
+  pinMode(rs485ControlPin, OUTPUT);
+  digitalWrite(rs485ControlPin, RS485_RECEIVE);  // Init Transceiver
 }
 
 void startEthernet() {
-  Ethernet.setRstPin(ethResetPin);
+  if (ethResetPin != 0) {
+    pinMode(ethResetPin, OUTPUT);
+    digitalWrite(ethResetPin, LOW);
+    delay(25);
+    digitalWrite(ethResetPin, HIGH);
+    delay(500);
+  }
 #ifdef ENABLE_DHCP
-  if (!localConfig.enableDhcp || !Ethernet.begin(localConfig.mac)) {
-    Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.subnet, localConfig.gateway, localConfig.dns);
+  if (localConfig.enableDhcp) {
+    dhcpSuccess = Ethernet.begin(localConfig.mac);
+  }
+  if (!localConfig.enableDhcp || dhcpSuccess == false) {
+    Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
   }
 #else /* ENABLE_DHCP */
-  Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.subnet, localConfig.gateway, localConfig.dns);
-  localConfig.enableDhcp = false;                 // Ensure Dhcp is disabled in config
+  Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+  localConfig.enableDhcp = false;                 // Make sure Dhcp is disabled in config
 #endif /* ENABLE_DHCP */
   modbusServer = EthernetServer(localConfig.tcpPort);
   webServer = EthernetServer(localConfig.webPort);
   Udp.begin(localConfig.udpPort);
   modbusServer.begin();
   webServer.begin();
+  // Ethernet library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).
+  // Therefore, for Arduino Mega + W5100, MAX_SOCK_NUM is wrongly set to 8
+  if (Ethernet.hardwareStatus() == EthernetW5100) {
+    maxSockNum = 4;
+  }
   dbg(F("[arduino] Server available at http://"));
   dbgln(Ethernet.localIP());
 }
 
 void(* resetFunc) (void) = 0;   //declare reset function at address 0
+
+void maintainDhcp()
+{
+  if (localConfig.enableDhcp && dhcpSuccess == true) {      // only call maintain if initial DHCP request by startEthernet was successfull
+    uint8_t maintainResult = Ethernet.maintain();
+    if (maintainResult == 1 || maintainResult == 3) {    // renew failed or rebind failed
+      dhcpSuccess = false;
+      startEthernet();      // another DHCP request, fallback to static IP
+    }
+  }
+}
 
 void maintainUptime()
 {
@@ -82,13 +118,63 @@ void maintainUptime()
 
 void maintainCounters()
 {
-  // synchronize roll-over of data counters to zero, at 0xFFFFF000
-  if (serialTxCount > 0xFFFFF000 || serialRxCount > 0xFFFFF000 || ethTxCount > 0xFFFFF000 || ethRxCount > 0xFFFFF000) {
+  // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively
+#ifdef ENABLE_EXTRA_DIAG
+  const unsigned long rollover = 0xFFFFFF00;
+#else
+  const unsigned int rollover = 0xFF00;
+#endif /* ENABLE_EXTRA_DIAG */
+  if (serialTxCount > rollover || serialRxCount > rollover || ethTxCount > rollover || ethRxCount > rollover) {
     serialRxCount = 0;
     serialTxCount = 0;
     ethRxCount = 0;
     ethTxCount = 0;
   }
+}
+
+
+void generateMac()
+{
+  // Marsaglia algorithm from https://github.com/RobTillaart/randomHelpers
+  seed1 = 36969L * (seed1 & 65535L) + (seed1 >> 16);
+  seed2 = 18000L * (seed2 & 65535L) + (seed2 >> 16);
+  uint32_t randomBuffer = (seed1 << 16) + seed2;  /* 32-bit random */
+
+  for (byte i = 0; i < 3; i++) {
+    localConfig.mac[i + 3] = randomBuffer & 0xFF;
+    randomBuffer >>= 8;
+  }
+}
+
+void CreateTrulyRandomSeed()
+{
+  seed1 = 0;
+  nrot = 32; // Must be at least 4, but more increased the uniformity of the produced
+  // seeds entropy.
+
+  // The following five lines of code turn on the watch dog timer interrupt to create
+  // the seed value
+  cli();
+  MCUSR = 0;
+  _WD_CONTROL_REG |= (1 << _WD_CHANGE_BIT) | (1 << WDE);
+  _WD_CONTROL_REG = (1 << WDIE);
+  sei();
+
+  while (nrot > 0);  // wait here until seed is created
+
+  // The following five lines turn off the watch dog timer interrupt
+  cli();
+  MCUSR = 0;
+  _WD_CONTROL_REG |= (1 << _WD_CHANGE_BIT) | (0 << WDE);
+  _WD_CONTROL_REG = (0 << WDIE);
+  sei();
+}
+
+ISR(WDT_vect)
+{
+  nrot--;
+  seed1 = seed1 << 8;
+  seed1 = seed1 ^ TCNT1L;
 }
 
 // Board definitions

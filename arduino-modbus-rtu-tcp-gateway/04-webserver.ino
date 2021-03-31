@@ -3,7 +3,7 @@
 
    recvWeb
    - receives GET requests for web pages
-   - receives POST data from web forms 
+   - receives POST data from web forms
    - calls processPost
    - sends web pages, for simplicity, all web pages should be numbered (1.htm, 2.htm, ...), the page number is passed to sendPage() function
    - executes actions (such as ethernet restart, reboot) during "please wait" web page
@@ -13,19 +13,19 @@
    - updates localConfig (in RAM)
    - saves config into EEPROM
    - executes actions which do not require webserver restart
-   
+
    ***************************************************************** */
 
 
 const byte pagesCnt = 5;                   // number of consecutive pages ("1.htm", "2.htm"....) served by the server, maximum is 9
-const uint16_t webInBufferSize = 128;      // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
-const uint16_t smallbuffersize = 32;       // a smaller buffer for uri
+const byte webInBufferSize = 128;      // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
+const byte smallbuffersize = 32;       // a smaller buffer for uri
 
 // Actions that need to be taken after saving configuration.
 // Order of these actions must correspond to POST param values of buttons on the "Tools" web page (e.g. "value=1" for Restore factory defaults, etc.)
 enum action_type : byte
 {
-  NONE, FACTORY, MAC, ETH_SOFT, ETH_HARD, SERIAL_SOFT, REBOOT, SCAN, WEB
+  NONE, FACTORY, MAC, REBOOT, ETH_SOFT, SERIAL_SOFT, SCAN, WEB
 };
 enum action_type action;
 
@@ -35,13 +35,12 @@ void recvWeb()
   if (client) {
     dbg(F("[web] Data from client "));
 
-    char uri[smallbuffersize];                   // the requestet page, shorter than smallbuffersize - method
+    char uri[smallbuffersize];                   // the requested page
     // char requestParameter[smallbuffersize];      // parameter appended to the URI after a ?
     // char postParameter[smallbuffersize] {'\0'};         // parameter transmitted in the body / by POST
-    // while (client.connected()) {
     if (client.available()) {
       char webInBuffer[webInBufferSize] {'\0'};          // buffer for incoming data
-      int i = 0;                               // index / current read position
+      unsigned int i = 0;                               // index / current read position
       enum status_type : byte
       {
         REQUEST, CONTENT_LENGTH, EMPTY_LINE, BODY
@@ -108,18 +107,19 @@ void recvWeb()
     }
 
     // Actions that require "please wait" page
-    if (action == WEB || action == REBOOT || action == ETH_SOFT || action == ETH_HARD || action == FACTORY || action == MAC) {
+    if (action == WEB || action == REBOOT || action == ETH_SOFT || action == FACTORY || action == MAC) {
       sendPage(client, 0xFF);                                 // Send "please wait" page
-      // delay(1);                          // do we need it??
       // Do all actions before the "please wait" redirects (5s delay at the moment)
-      for (byte n = 0; n < Ethernet._maxSockNum; n++) {
+      for (byte n = 0; n < maxSockNum; n++) {
         // in case of webserver restart, stop only clients from old webserver (clients with port different from current settings)
         EthernetClient clientTemp = EthernetClient(n);
-        if (action != WEB || (Ethernet._server_port[n] && Ethernet._server_port[n] != localConfig.webPort && Ethernet._server_port[n] != localConfig.udpPort && Ethernet._server_port[n] != localConfig.tcpPort)) {
+        // for WEB, stop only clients from old webserver (those that do not match modbus ports or current web port); for other actions stop all clients
+        if (action != WEB || (clientTemp.localPort() && clientTemp.localPort() != localConfig.webPort && clientTemp.localPort() != localConfig.udpPort && clientTemp.localPort() != localConfig.tcpPort)) {
           clientTemp.flush();
           clientTemp.stop();
         }
       }
+
       switch (action) {
         case WEB:
           webServer = EthernetServer(localConfig.webPort);
@@ -130,13 +130,7 @@ void recvWeb()
           delay(1);
           resetFunc();
           break;
-        case ETH_HARD:
-          Ethernet.hardreset();
-        case ETH_SOFT:
-        case FACTORY:
-        case MAC:
-          Ethernet.softreset();
-        default:          // triggered by cases without break;
+        default:          // ETH_SOFT, FACTORY, MAC
           Udp.stop();
           startEthernet();
           break;
@@ -150,12 +144,10 @@ void recvWeb()
       send204(client);                         // if you don't have a favicon, send 204
     else                                       // if the page is unknown, HTTP response code 404
       send404(client);
-    // delay(1);                          // do we need it??
     client.stop();
     action = NONE;
     dbg(F("[web] Stop client "));
-    // }
-  }         
+  }
 }
 
 
@@ -169,7 +161,6 @@ void processPost(char postParameter[]) {
     char *paramKey;
     char *paramValue;
     char *sav2 = NULL;            // for inner strtok_r
-    char buf[7] {'\0'};           // for itoa, max length 6 bytes
     paramKey = strtok_r(point, "=", &sav2);   // inner strtok_r, use sav2
 
     switch (paramKey[0]) {
@@ -217,9 +208,9 @@ void processPost(char postParameter[]) {
             switch (atoi(paramKey + 1)) {
               case 1:             // TCP port
                 if (localConfig.tcpPort != paramValueUint) {
-                  for (byte i = 0; i < Ethernet._maxSockNum; i++) {
+                  for (byte i = 0; i < maxSockNum; i++) {
                     EthernetClient clientTemp = EthernetClient(i);
-                    if (Ethernet._server_port[i] == localConfig.tcpPort) {
+                    if (clientTemp.status() != SnSR::UDP && clientTemp.localPort() == localConfig.tcpPort) {
                       clientTemp.flush();
                       clientTemp.stop();
                     }
@@ -294,7 +285,7 @@ void processPost(char postParameter[]) {
         }
       case 'a':                               // processing Tools buttons
         {
-          action = atoi(strtok_r(NULL, "=", &sav2));
+          action = (byte)atoi(strtok_r(NULL, "=", &sav2));
           break;
         default:
           break;
@@ -312,9 +303,7 @@ void processPost(char postParameter[]) {
         break;
       }
     case MAC:
-      for (int i = 3; i < 6; i++) {
-        localConfig.mac[i] = TrueRandom.randomByte();
-      }
+      generateMac();
       break;
     case SCAN:
       scanCounter = 1;
