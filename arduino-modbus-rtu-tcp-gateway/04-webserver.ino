@@ -285,7 +285,7 @@ void processPost(char postParameter[]) {
         }
       case 'a':                               // processing Tools buttons
         {
-          action = (byte)atoi(strtok_r(NULL, "=", &sav2));
+          action = (action_type)atoi(strtok_r(NULL, "=", &sav2));
           break;
         default:
           break;
