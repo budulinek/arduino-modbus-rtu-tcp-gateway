@@ -15,7 +15,7 @@
 
    maintainDhcp()
    - maintain DHCP lease
-   
+
    maintainUptime
    - maintains up time in case of millis() overflow
 
@@ -51,8 +51,10 @@ void startSerial() {
     charTimeout = 750;
     frameDelay = 1750;
   }
-  pinMode(rs485ControlPin, OUTPUT);
-  digitalWrite(rs485ControlPin, RS485_RECEIVE);  // Init Transceiver
+#ifdef RS485_CONTROL_PIN
+  pinMode(RS485_CONTROL_PIN, OUTPUT);
+  digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Init Transceiver
+#endif /* RS485_CONTROL_PIN */
 }
 
 void startEthernet() {

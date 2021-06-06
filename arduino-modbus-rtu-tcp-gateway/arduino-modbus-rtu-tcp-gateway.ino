@@ -47,7 +47,7 @@ const int reqQueueSize = 256;        // total length of TCP or UDP requests stor
 const byte maxSlaves = 247;          // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
 const int modbusSize = 256;          // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
 #define mySerial Serial              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3         
-const byte rs485ControlPin = 6;      // Arduino Pin for RS485 Direction control
+#define RS485_CONTROL_PIN 6          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
 const byte ethResetPin = 7;          // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
 const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
 

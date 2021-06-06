@@ -27,13 +27,15 @@ MicroTimer txDelay;
 void sendSerial()
 {
   if (serialState == SENDING && rxNdx == 0) {        // avoid bus collision, only send when we are not receiving data
-    if (mySerial.availableForWrite() > 0 && txNdx == 0 && digitalRead(rs485ControlPin) == RS485_RECEIVE) {
-      digitalWrite(rs485ControlPin, RS485_TRANSMIT);           // Enable RS485 Transmit
+    if (mySerial.availableForWrite() > 0 && txNdx == 0) {
+#ifdef RS485_CONTROL_PIN
+      digitalWrite(RS485_CONTROL_PIN, RS485_TRANSMIT);           // Enable RS485 Transmit
+#endif /* RS485_CONTROL_PIN */
       crc = 0xFFFF;
       mySerial.write(queueHeaders.first().uid);        // send uid (address)
       calculateCRC(queueHeaders.first().uid);
     }
-    while (mySerial.availableForWrite() > 0 && txNdx < queueHeaders.first().PDUlen && digitalRead(rs485ControlPin) == RS485_TRANSMIT) {
+    while (mySerial.availableForWrite() > 0 && txNdx < queueHeaders.first().PDUlen) {
       mySerial.write(queuePDUs[txNdx]);                // send func and data
       calculateCRC(queuePDUs[txNdx]);
       txNdx++;
@@ -57,7 +59,9 @@ void sendSerial()
   } else if (serialState == DELAY && txDelay.isOver()) {
     serialTxCount += queueHeaders.first().PDUlen + 1;    // in Modbus RTU over TCP, queuePDUs already contains CRC
     if (!localConfig.enableRtuOverTcp) serialTxCount += 2;  // in Modbus TCP, add 2 bytes for CRC
-    digitalWrite(rs485ControlPin, RS485_RECEIVE);                                    // Disable RS485 Transmit
+#ifdef RS485_CONTROL_PIN
+    digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);                                    // Disable RS485 Transmit
+#endif /* RS485_CONTROL_PIN */
     if (queueHeaders.first().uid == 0x00) {           // Modbus broadcast - we do not count attempts and delete immediatelly
       serialState = IDLE;
       deleteRequest();

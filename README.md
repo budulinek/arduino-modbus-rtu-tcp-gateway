@@ -41,21 +41,20 @@ Screenshots of the web interface:
   - queue will accept only one requests to non-responding slaves
 
 ## How can I build it myself?
-Get the hardware. Cheap clones from China are sufficient:
+Get the hardware (cheap clones from China are sufficient) and connect together:
 
-* Arduino Nano, Uno or Mega (and possibly other)
+* Arduino Nano, Uno or Mega (and possibly other). On Mega you have to configure Serial in ADVANCED SETTINGS in the sketch.
 * W5100, W5200 or W5500 based Ethernet shield (for Nano, I recommend W5500 Ethernet Shield from RobotDyn)
-* MAX485 module
-
-Connect the hardware (on Nano and Uno, the sketch uses HW Serial, on Mega you have to configure Serial in ADVANCED SETTINGS in the sketch):
-
-* Arduino <-> MAX485
-
-* Tx1 <-> DI
-
-* Rx0 <-> RO
-
-* Pin 6 <-> DE,RE
+* TTL to RS485 module:
+  - with hardware automatic flow control (recommended)
+    Arduino <-> Module
+    Tx1 <-> Tx
+    Rx0 <-> Rx
+  - with flow controlled by pin (such as MAX485 module):
+    Arduino <-> MAX485
+    Tx1 <-> DI
+    Rx0 <-> RO
+    Pin 6 <-> DE,RE
 
 Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (both are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
 
