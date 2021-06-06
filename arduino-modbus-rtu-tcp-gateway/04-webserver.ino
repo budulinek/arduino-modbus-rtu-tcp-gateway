@@ -144,7 +144,6 @@ void recvWeb()
       send204(client);                         // if you don't have a favicon, send 204
     else                                       // if the page is unknown, HTTP response code 404
       send404(client);
-    client.stop();
     action = NONE;
     dbg(F("[web] Stop client "));
   }

@@ -133,7 +133,6 @@ void recvTcp()
         client.write(lowByte(crc));        // send CRC, low byte first
         client.write(highByte(crc));
       }
-      client.stop();
       ethTxCount += 5;
       if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
     }

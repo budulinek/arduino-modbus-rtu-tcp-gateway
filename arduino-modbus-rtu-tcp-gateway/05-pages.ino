@@ -564,7 +564,7 @@ void send404(EthernetClient &client)
   client.println(F("HTTP/1.0 404 Not Found"));
   client.println(F("Content-Type: text/plain"));  // simple plain text without html tags
   client.println();
-  client.println(F("File Fot Found"));
+  client.println(F("File Not Found"));
 }
 
 

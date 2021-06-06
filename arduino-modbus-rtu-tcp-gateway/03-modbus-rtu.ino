@@ -112,7 +112,6 @@ void recvSerial()
             client.write(MBAP, 6);
             client.write(serialIn, rxNdx - 2);      //send without CRC
           }
-          client.stop();
           ethTxCount += rxNdx;
           if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
         }
@@ -161,7 +160,6 @@ void recvSerial()
             client.write(lowByte(crc));        // send CRC, low byte first
             client.write(highByte(crc));
           }
-          client.stop();
           ethTxCount += 5;
           if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
         }
