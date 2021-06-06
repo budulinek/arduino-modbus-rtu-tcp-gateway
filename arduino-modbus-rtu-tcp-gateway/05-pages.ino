@@ -43,7 +43,7 @@ void sendPage(EthernetClient &client, byte reqPage)
   if (reqPage == 1 || reqPage == 0xFF) page.print(F(" http-equiv=refresh content=5"));
   if (reqPage == 0xFF) {
     page.print(F(";url=http://"));
-    page.print(localConfig.ip);
+    page.print((IPAddress)localConfig.ip);
     page.print(F(":"));
     page.print(localConfig.webPort);
   }
