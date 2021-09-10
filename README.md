@@ -55,6 +55,10 @@ Get the hardware (cheap clones from China are sufficient) and connect together:
       Tx1 <-> DI<br>
       Rx0 <-> RO<br>
       Pin 6 <-> DE,RE
+      
+Here is my setup:
+Terminal shield + Arduino Nano + W5500 eth shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
+<img src="/pics/HW.jpg" alt="01" style="zoom:100%;" />
 
 Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (both are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
 
