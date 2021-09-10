@@ -541,7 +541,7 @@ void contentRtu(ChunkedPrint& content)
 void contentTools(ChunkedPrint& content)
 {
   content.print(F("<tr><td>Factory Defaults:<td><button name=a value=1>Restore</button> (Static IP: "));
-  content.print(defaultConfig.ip);
+  content.print((IPAddress)defaultConfig.ip);
   content.print(F(")"
                   "<tr><td>MAC Address: <td><button name=a value=2>Generate New</button>"
                   "<tr><td>Microcontroller: <td><button name=a value=3>Reboot</button>"));
