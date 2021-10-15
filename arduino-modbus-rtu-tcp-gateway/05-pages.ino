@@ -155,6 +155,10 @@ void menuItem(ChunkedPrint& menu, byte item) {
 //        Current Status
 void contentStatus(ChunkedPrint& content)
 {
+  content.print(F("<tr><td>SW Version:<td>"));
+  content.print(version[0], HEX);
+  content.print(F("."));
+  content.print(version[1], HEX);
   content.print(F("<tr><td>Microcontroller:<td>"));
   content.print(BOARD);
   content.print(F("<tr><td>Ethernet Chip:<td>"));
@@ -352,7 +356,7 @@ void contentStatus(ChunkedPrint& content)
         content.print(F(" OK"));
         countSlaves++;
       }
-      else content.print(F(" waiting..."));
+      else content.print(F(" scanning..."));
     }
   }
   if (countSlaves == 0 && scanCounter == 0) content.print(F("<tr><td><td>none"));

@@ -311,7 +311,7 @@ void processPost(char postParameter[]) {
       break;
   }
   // new parameter values received, save them to EEPROM
-  EEPROM.put(configStart, localConfig);    // it is safe to call, only changed values are updated
+  EEPROM.put(configStart + 1, localConfig);    // it is safe to call, only changed values are updated
   if (action == SERIAL_SOFT) {              // can do it without "please wait" page
     dbgln(F("[serial] reload Serial"));
     Serial.flush();

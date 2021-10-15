@@ -24,8 +24,20 @@
   Rx0 <-> RO
   Pin 6 <-> DE,RE
 
+  Version history
+  v0.1 2020-04-05 Initial commit
+  v0.2 2021-03-02 Random MAC generation
+  v1.0 2021-03-20 Add web interface, settings stored in EEPROM
+  v2.0 2021-04-01 Improve random MAC algorithm (Marsaglia algorithm from https://github.com/RobTillaart/randomHelpers),
+                  replace some libraries with more efficient code, compatibility with Arduino Mega
+  v2.1 2021-04-12 Code optimisation
+  v2.2 2021-06-06 Fix TCP closed socket, support RS485 modules with hardware automatic flow control
+  v2.3 2021-09-10 Fix IPAddress cast (gateway freeze)
+  v2.4 2021-10-15 Add SW version. Forced factory reset (load defaut settings from sketch) on MAJOR version change.
 
 */
+
+const byte version[] = {2, 4};
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -63,7 +75,6 @@ const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent duri
 
 typedef struct
 {
-  char marker;
   byte mac[6];
   bool enableDhcp;
   IPAddress ip;
@@ -82,12 +93,13 @@ typedef struct
 
 /*
   Please note that after boot, Arduino loads settings stored in EEPROM, even if you flash new program to it!
-  If you want to force Arduino to load factory defaults specified bellow, you must either
-  1) click "Restore" defaults in WebUI (factory reset configuration, keeps MAC)
-  2) change "marker" in the sketch to another character (factory reset configuration AND generates new MAC)
+  
+  Arduino loads factory defaults specified bellow in case:
+  1) User clicks "Restore" defaults in WebUI (factory reset configuration, keeps MAC)
+  2) VERSION_MAJOR changes (factory reset configuration AND generates new MAC)
 */
+
 const config_type defaultConfig = {
-  't',                   // marker (if marker specified in sketch and stored in EEPROM are the same, settings from EEPROM are loaded during boot)
   { 0x90, 0xA2, 0xDA },  // mac (bytes 4, 5 and 6 will be generated randomly)
   false,                 // enableDhcp
   {192, 168, 1, 254},    // ip
@@ -211,15 +223,16 @@ void setup()
   CreateTrulyRandomSeed();
 
   // is config already stored in EEPROM?
-  if (EEPROM.read(configStart) == defaultConfig.marker) {
+  if (EEPROM.read(configStart) == version[0]) {
     // load (configStart) the local configuration struct from EEPROM
-    EEPROM.get(configStart, localConfig);
+    EEPROM.get(configStart + 1, localConfig);
   } else {
     // load (overwrite) the local configuration struct from defaults and save them to EEPROM
     localConfig = defaultConfig;
     // generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
     generateMac();
-    EEPROM.put(configStart, localConfig);
+    EEPROM.write(configStart, version[0]);
+    EEPROM.put(configStart + 1, localConfig);
   }
 
   startSerial();
