@@ -34,10 +34,11 @@
   v2.2 2021-06-06 Fix TCP closed socket, support RS485 modules with hardware automatic flow control
   v2.3 2021-09-10 Fix IPAddress cast (gateway freeze)
   v2.4 2021-10-15 Add SW version. Forced factory reset (load defaut settings from sketch) on MAJOR version change.
+  v3.0 2021-11-07 Improve POST parameters processing, bugfix 404 and 204 error headers. 
 
 */
 
-const byte version[] = {2, 4};
+const byte version[] = {3, 0};
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -64,6 +65,7 @@ const byte ethResetPin = 7;          // Ethernet shield reset pin (deals with po
 const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
 
 // #define DEBUG            // Main Serial (USB) is used for printing some debug info, not for Modbus RTU. At the moment, only web server related debug messages are printed.
+#define debugSerial Serial
 
 /****** EXTRA FUNCTIONS ******/
 
@@ -93,7 +95,7 @@ typedef struct
 
 /*
   Please note that after boot, Arduino loads settings stored in EEPROM, even if you flash new program to it!
-  
+
   Arduino loads factory defaults specified bellow in case:
   1) User clicks "Restore" defaults in WebUI (factory reset configuration, keeps MAC)
   2) VERSION_MAJOR changes (factory reset configuration AND generates new MAC)
@@ -131,8 +133,8 @@ EthernetUDP Udp;
 EthernetServer modbusServer(502);
 EthernetServer webServer(80);
 #ifdef DEBUG
-#define dbg(x...) Serial.print(x);
-#define dbgln(x...) Serial.println(x);
+#define dbg(x...) debugSerial.print(x);
+#define dbgln(x...) debugSerial.println(x);
 #else /* DEBUG */
 #define dbg(x...) ;
 #define dbgln(x...) ;
@@ -234,6 +236,10 @@ void setup()
     EEPROM.write(configStart, version[0]);
     EEPROM.put(configStart + 1, localConfig);
   }
+
+#ifdef DEBUG
+  debugSerial.begin(baud);
+#endif /* DEBUG */
 
   startSerial();
   startEthernet();

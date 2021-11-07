@@ -23,128 +23,128 @@
 
    ***************************************************************** */
 
-const byte webOutBufferSize = 64;               // size of web server write buffer (used by StreamLib)
+const byte webOutBufferSize = 128;               // size of web server write buffer (used by StreamLib)
 
 void sendPage(EthernetClient &client, byte reqPage)
 {
-  dbgln(F("[web] 200 response send"));
   char webOutBuffer[webOutBufferSize];
-  ChunkedPrint page(client, webOutBuffer, sizeof(webOutBuffer));
-  page.println(F("HTTP/1.1 200 OK"));
-  page.println(F("Connection: close"));
-  page.println(F("Content-Type: text/html"));
-  page.println(F("Transfer-Encoding: chunked"));
-  page.println();
-  page.begin();
-  page.print(F("<!doctype html>"            // the start of the HTTP Body - contains the HTML
-               "<html lang=en>"
-               "<head>"
-               "<meta charset=utf-8"));
-  if (reqPage == 1 || reqPage == 0xFF) page.print(F(" http-equiv=refresh content=5"));
-  if (reqPage == 0xFF) {
-    page.print(F(";url=http://"));
-    page.print((IPAddress)localConfig.ip);
-    page.print(F(":"));
-    page.print(localConfig.webPort);
+  ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer)); // the StreamLib object to replace client print
+  dbgln(F("[web out] 200 response send"));
+  chunked.print(F("HTTP/1.1 200 OK\r\n"
+                  "Connection: close\r\n"
+                  "Content-Type: text/html\r\n"
+                  "Transfer-Encoding: chunked\r\n"
+                  "\r\n"));
+  chunked.begin();
+  chunked.print(F("<!doctype html>"            // the start of the HTTP Body - contains the HTML
+                  "<html lang=en>"
+                  "<head>"
+                  "<meta charset=utf-8"));
+  if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
+  if (reqPage == PAGE_WAIT) {                                 // redirect to new IP and web port
+    chunked.print(F(";url=http://"));
+    chunked.print((IPAddress)localConfig.ip);
+    chunked.print(F(":"));
+    chunked.print(localConfig.webPort);
   }
-  page.print(F(">"
-               "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
-               "<style>"
-               "a {text-decoration:none;color:white}"
-               "td:first-child {text-align:right;width:30%}"
-               "th {text-align:left;background-color:#0067AC;color:white;padding:10px}"
-               "table {width:100%}"
-               "</style>"
-               "</head>"
-               "<body style='font-family:sans-serif'"));
+  chunked.print(F(">"
+                  "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
+                  "<style>"
+                  "a {text-decoration:none;color:white}"
+                  "td:first-child {text-align:right;width:30%}"
+                  "th {text-align:left;background-color:#0067AC;color:white;padding:10px}"
+                  "table {width:100%}"
+                  "</style>"
+                  "</head>"
+                  "<body style='font-family:sans-serif'"));
 #ifdef ENABLE_DHCP
-  page.print(F(" onload='dis(document.getElementById(&quot;box&quot;).checked)'>"
-               "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
+  chunked.print(F(" onload='dis(document.getElementById(&quot;box&quot;).checked)'>"
+                  "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
 #endif /* ENABLE_DHCP */
-  page.print(F(">"
-               "<table height=100% style='position:absolute;top:0;bottom:0;left:0;right:0'>"
-               "<tr style='height:10px'><th colspan=2>"
-               "<h1 style='margin:0px'>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
-               "<tr>"                                           // second row is left menu (first cell) and main page (second cell)
-               "<th valign=top style=width:20%;padding:0px>"
+  chunked.print(F(">"
+                  "<table height=100% style='position:absolute;top:0;bottom:0;left:0;right:0'>"
+                  "<tr style='height:10px'><th colspan=2>"
+                  "<h1 style='margin:0px'>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
+                  "<tr>"                                           // second row is left menu (first cell) and main page (second cell)
+                  "<th valign=top style=width:20%;padding:0px>"
 
-               // Left Menu
-               "<table>"));
-  for (byte i = 0; i < pagesCnt; i++) {
-    page.print(F("<tr><th"));
-    if ((i + 1) == reqPage) {
-      page.print(F(" style=background-color:#FF6600"));
+                  // Left Menu
+                  "<table>"));
+  for (byte i = 1; i < PAGE_WAIT; i++) {
+    chunked.print(F("<tr><th"));
+    if ((i) == reqPage) {
+      chunked.print(F(" style=background-color:#FF6600"));
     }
-    page.print(F("><a href="));
-    page.print(i + 1);
-    page.print(F(".htm>"));
-    menuItem(page, i + 1);
-    page.print(F("</a>"));
+    chunked.print(F("><a href="));
+    chunked.print(i);
+    chunked.print(F(".htm>"));
+    menuItem(chunked, i);
+    chunked.print(F("</a>"));
   }
-  page.print(F("</table><td valign=top style=padding:0px>"));
+  chunked.print(F("</table><td valign=top style=padding:0px>"));
 
   // Main Page
-  page.print(F("<form action=/"));
-  page.print(reqPage);
-  page.print(F(".htm method=post>"
-               "<table style=border-collapse:collapse>"
-               "<tr><th><th>"));
-  menuItem(page, reqPage);
-  page.print(F("<tr><td><br>"));
+  chunked.print(F("<form action=/"));
+  chunked.print(reqPage);
+  chunked.print(F(".htm method=post>"
+                  "<table style=border-collapse:collapse>"
+                  "<tr><th><th>"));
+  menuItem(chunked, reqPage);
+  chunked.print(F("<tr><td><br>"));
 
   //   PLACE FUNCTIONS PROVIDING CONTENT HERE
   // content should start with new table row <tr>
 
   switch (reqPage) {
-    case 0:
+    case PAGE_NONE:
       break;
-    case 1:
-      contentStatus(page);
+    case PAGE_STATUS:
+      contentStatus(chunked);
       break;
-    case 2:
-      contentIp(page);
+    case PAGE_IP:
+      contentIp(chunked);
       break;
-    case 3:
-      contentTcp(page);
+    case PAGE_TCP:
+      contentTcp(chunked);
       break;
-    case 4:
-      contentRtu(page);
+    case PAGE_RTU:
+      contentRtu(chunked);
       break;
-    case 5:
-      contentTools(page);
+    case PAGE_TOOLS:
+      contentTools(chunked);
       break;
-    case 0xFF:
-      contentWait(page);
+    case PAGE_WAIT:
+      contentWait(chunked);
       break;
     default:
       break;
   }
-  if (reqPage >= 2 && reqPage <= 4) {
-    page.print(F("<tr><td><br><input type=submit value='Save & Apply'><td><br><input type=reset value=Cancel>"));
+  if (reqPage == PAGE_IP || reqPage == PAGE_TCP || reqPage == PAGE_RTU) {
+    chunked.print(F("<tr><td><br><input type=submit value='Save & Apply'><td><br><input type=reset value=Cancel>"));
   }
-  page.print(F("</table></form>"
-               "</table></body></html>"));
-  page.end();
+  chunked.print(F("</table></form>"
+                  "</table></body></html>"));
+  chunked.end();
 }
 
-// Menu items, item corresponds to requested page number
+// Menu item strings
 void menuItem(ChunkedPrint& menu, byte item) {
   switch (item) {
-    case 0:
+    case PAGE_NONE:
       break;
-    case 1:
+    case PAGE_STATUS:
       menu.print(F("Current Status"));
       break;
-    case 2:
+    case PAGE_IP:
       menu.print(F("IP Settings"));
       break;
-    case 3:
+    case PAGE_TCP:
       menu.print(F("TCP/UDP Settings"));
       break;
-    case 4:
+    case PAGE_RTU:
       menu.print(F("RS485 Settings"));
       break;
-    case 5:
+    case PAGE_TOOLS:
       menu.print(F("Tools"));
       break;
     default:
@@ -345,7 +345,11 @@ void contentStatus(ChunkedPrint& content)
   }
   if (countMasters == 0) content.print(F("<td>none"));
   content.print(F("<tr><td><br>"
-                  "<tr><td>Modbus RTU Slaves:<td><button name=a value=6>Scan</button>"));  // value=6 must correspond to enum action = SCAN
+                  "<tr><td>Modbus RTU Slaves:<td><button name="));
+  content.print(POST_ACTION);
+  content.print(F(" value="));
+  content.print(SCAN);
+  content.print(F(">Scan</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
     if (getSlaveResponding(k) == true || k == scanCounter) {
@@ -368,8 +372,12 @@ void contentIp(ChunkedPrint& content)
 {
 #ifdef ENABLE_DHCP
   content.print(F("<tr><td>Auto IP:"
-                  "<td><input type=hidden name=i1 value=0>"
-                  "<input type=checkbox id=box name=i1 onclick=dis(this.checked) value=1"));
+                  "<td><input type=hidden name="));
+  content.print(POST_DHCP);
+  content.print(F("value=0>"
+                  "<input type=checkbox id=box name="));
+  content.print(POST_DHCP);
+  content.print(F("onclick=dis(this.checked) value=1"));
   if (localConfig.enableDhcp) content.print(F(" checked"));
   content.print(F(">Enable DHCP"));
 #endif /* ENABLE_DHCP */
@@ -393,8 +401,8 @@ void contentIp(ChunkedPrint& content)
     }
     content.print(F(":<td>"));
     for (byte i = 0; i < 4; i++) {
-      content.print(F("<input name=i"));
-      content.print(i + 2 + (j * 4));
+      content.print(F("<input name="));
+      content.print(POST_IP + i + (j * 4));
       content.print(F(" type=tel class=ip required maxlength=3 size=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
       switch (j) {
         case 0:
@@ -438,9 +446,8 @@ void contentTcp(ChunkedPrint& content)
     }
     content.print(F(" Port:"));
     helperInput(content);
-    content.print(F("t"));
-    content.print(i + 1);
-    content.print(F("min=1 max=65535 value="));
+    content.print(POST_TCP + i);
+    content.print(F(" min=1 max=65535 value="));
     switch (i) {
       case 0:
         content.print(localConfig.tcpPort);
@@ -456,7 +463,9 @@ void contentTcp(ChunkedPrint& content)
     }
     content.print(F(">"));
   }
-  content.print(F("<tr><td>Modbus Mode:<td><select name=t4>"));
+  content.print(F("<tr><td>Modbus Mode:<td><select name="));
+  content.print(POST_RTU_OVER);
+  content.print(F(">"));
   for (byte i = 0; i < 2; i++) {
     content.print(F("<option value="));
     content.print(i);
@@ -482,10 +491,13 @@ void contentRtu(ChunkedPrint& content)
 {
   content.print(F("<tr><td>Baud Rate:"));
   helperInput(content);
-  content.print(F("r1 min=300 max=250000 value="));
+  content.print(POST_BAUD);
+  content.print(F(" min=300 max=250000 value="));
   content.print(localConfig.baud);
   content.print(F("> (300~250000) bps"
-                  "<tr><td>Data Bits:<td><select name=r2>"));
+                  "<tr><td>Data Bits:<td><select name="));
+  content.print(POST_DATA);
+  content.print(F(">"));
   for (byte i = 5; i <= 8; i++) {
     content.print(F("<option value="));
     content.print(i);
@@ -496,7 +508,9 @@ void contentRtu(ChunkedPrint& content)
   }
   content.print(F("</select> bit"
                   "<tr><td>Parity:<td>"
-                  "<select name=r3>"));
+                  "<select name="));
+  content.print(POST_PARITY);
+  content.print(F(">"));
   for (byte i = 0; i <= 3; i++) {
     if (i == 1) continue;       // invalid value, skip and continue for loop
     content.print(F("<option value="));
@@ -519,7 +533,9 @@ void contentRtu(ChunkedPrint& content)
     content.print(F("</option>"));
   }
   content.print(F("</select>"
-                  "<tr><td>Stop Bits:<td><select name=r4>"));
+                  "<tr><td>Stop Bits:<td><select name="));
+  content.print(POST_STOP);
+  content.print(F(">"));
   for (byte i = 1; i <= 2; i++) {
     content.print(F("<option value="));
     content.print(i);
@@ -531,12 +547,14 @@ void contentRtu(ChunkedPrint& content)
   content.print(F("</select> bit"
                   "<tr><td>Response Timeout:"));
   helperInput(content);
-  content.print(F("r5 min=100 max=9999 value="));
+  content.print(POST_TIMEOUT);
+  content.print(F(" min=100 max=9999 value="));
   content.print(localConfig.serialTimeout);
   content.print(F("> (100~9999) ms"
                   "<tr><td>Retry Attempts:"));
   helperInput(content);
-  content.print(F("r6 min=1 max=10 value="));
+  content.print(POST_RETRY);
+  content.print(F(" min=1 max=10 value="));
   content.print(localConfig.serialRetry);
   content.print(F("> (1~10)"));
 }
@@ -544,11 +562,23 @@ void contentRtu(ChunkedPrint& content)
 //        Tools
 void contentTools(ChunkedPrint& content)
 {
-  content.print(F("<tr><td>Factory Defaults:<td><button name=a value=1>Restore</button> (Static IP: "));
+  content.print(F("<tr><td>Factory Defaults:<td><button name="));
+  content.print(POST_ACTION);
+  content.print(F(" value="));
+  content.print(FACTORY);
+  content.print(F(">Restore</button> (Static IP: "));
   content.print((IPAddress)defaultConfig.ip);
   content.print(F(")"
-                  "<tr><td>MAC Address: <td><button name=a value=2>Generate New</button>"
-                  "<tr><td>Microcontroller: <td><button name=a value=3>Reboot</button>"));
+                  "<tr><td>MAC Address: <td><button name="));
+  content.print(POST_ACTION);
+  content.print(F(" value="));
+  content.print(MAC);
+  content.print(F(">Generate New</button>"
+                  "<tr><td>Microcontroller: <td><button name="));
+  content.print(POST_ACTION);
+  content.print(F(" value="));
+  content.print(REBOOT);
+  content.print(F(">Reboot</button>"));
 }
 
 void contentWait(ChunkedPrint& content)
@@ -564,16 +594,16 @@ void helperInput(ChunkedPrint& helper)
 
 void send404(EthernetClient &client)
 {
-  dbgln(F("[web] response 404 file not found"));
-  client.println(F("HTTP/1.0 404 Not Found"));
-  client.println(F("Content-Type: text/plain"));  // simple plain text without html tags
-  client.println();
-  client.println(F("File Not Found"));
+  dbgln(F("[web out] response 404 file not found"));
+  client.println(F("HTTP/1.1 404 Not Found\r\n"
+                   "Content-Length: 0"));
+  client.stop();
 }
 
 
 void send204(EthernetClient &client)
 {
-  dbgln(F("[web] response 204 no content"));
-  client.println(F("HTTP/1.0 204 No content"));
+  dbgln(F("[web out] response 204 no content"));
+  client.println(F("HTTP/1.1 204 No content"));
+  client.stop();
 }
