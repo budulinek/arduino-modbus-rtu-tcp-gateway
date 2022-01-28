@@ -128,24 +128,24 @@ void sendPage(EthernetClient &client, byte reqPage)
 }
 
 // Menu item strings
-void menuItem(ChunkedPrint& menu, byte item) {
+void menuItem(ChunkedPrint &chunked, byte item) {
   switch (item) {
     case PAGE_NONE:
       break;
     case PAGE_STATUS:
-      menu.print(F("Current Status"));
+      chunked.print(F("Current Status"));
       break;
     case PAGE_IP:
-      menu.print(F("IP Settings"));
+      chunked.print(F("IP Settings"));
       break;
     case PAGE_TCP:
-      menu.print(F("TCP/UDP Settings"));
+      chunked.print(F("TCP/UDP Settings"));
       break;
     case PAGE_RTU:
-      menu.print(F("RS485 Settings"));
+      chunked.print(F("RS485 Settings"));
       break;
     case PAGE_TOOLS:
-      menu.print(F("Tools"));
+      chunked.print(F("Tools"));
       break;
     default:
       break;
@@ -153,179 +153,179 @@ void menuItem(ChunkedPrint& menu, byte item) {
 }
 
 //        Current Status
-void contentStatus(ChunkedPrint& content)
+void contentStatus(ChunkedPrint &chunked)
 {
-  content.print(F("<tr><td>SW Version:<td>"));
-  content.print(version[0], HEX);
-  content.print(F("."));
-  content.print(version[1], HEX);
-  content.print(F("<tr><td>Microcontroller:<td>"));
-  content.print(BOARD);
-  content.print(F("<tr><td>Ethernet Chip:<td>"));
+  chunked.print(F("<tr><td>SW Version:<td>"));
+  chunked.print(version[0], HEX);
+  chunked.print(F("."));
+  chunked.print(version[1], HEX);
+  chunked.print(F("<tr><td>Microcontroller:<td>"));
+  chunked.print(BOARD);
+  chunked.print(F("<tr><td>Ethernet Chip:<td>"));
   switch (Ethernet.hardwareStatus()) {
     case EthernetW5100:
-      content.print(F("W5100"));
+      chunked.print(F("W5100"));
       break;
     case EthernetW5200:
-      content.print(F("W5200"));
+      chunked.print(F("W5200"));
       break;
     case EthernetW5500:
-      content.print(F("W5500"));
+      chunked.print(F("W5500"));
       break;
     default:        // TODO: add W6100 once it is included in Ethernet library
-      content.print(F("unknown"));
+      chunked.print(F("unknown"));
       break;
   }
-  content.print(F("<tr><td>Ethernet Sockets:<td>"));
-  content.print(maxSockNum, HEX);
-  content.print(F("<tr><td>MAC Address:<td>"));
+  chunked.print(F("<tr><td>Ethernet Sockets:<td>"));
+  chunked.print(maxSockNum, HEX);
+  chunked.print(F("<tr><td>MAC Address:<td>"));
   byte macBuffer[6];
   Ethernet.MACAddress(macBuffer);
   for (byte i = 0; i < 6; i++) {
-    if (macBuffer[i] < 16) content.print(F("0"));
-    content.print(macBuffer[i], HEX);
-    if (i < 5) content.print(F(":"));
+    if (macBuffer[i] < 16) chunked.print(F("0"));
+    chunked.print(macBuffer[i], HEX);
+    if (i < 5) chunked.print(F(":"));
   }
 
 #ifdef ENABLE_DHCP
-  content.print(F("<tr><td>Auto IP:<td>"));
+  chunked.print(F("<tr><td>Auto IP:<td>"));
   if (!localConfig.enableDhcp) {
-    content.print(F("DHCP disabled"));
+    chunked.print(F("DHCP disabled"));
   } else if (dhcpSuccess == true) {
-    content.print(F("DHCP successful"));
+    chunked.print(F("DHCP successful"));
   } else {
-    content.print(F("DHCP failed, using fallback static IP"));
+    chunked.print(F("DHCP failed, using fallback static IP"));
   }
 #endif /* ENABLE_DHCP */
 
-  content.print(F("<tr><td>IP Address:<td>"));
-  content.print(Ethernet.localIP());
+  chunked.print(F("<tr><td>IP Address:<td>"));
+  chunked.print(Ethernet.localIP());
 
 #ifdef ENABLE_EXTRA_DIAG
-  content.print(F("<tr><td>Run Time:<td>"));
+  chunked.print(F("<tr><td>Run Time:<td>"));
   byte mod_seconds = byte((seconds) % 60);
   byte mod_minutes = byte((seconds / 60) % 60);
   byte mod_hours = byte((seconds / (60 * 60)) % 24);
   int days = (seconds / (60U * 60U * 24));
-  content.print(days);
-  content.print(F(" days, "));
-  content.print(mod_hours);
-  content.print(F(" hours, "));
-  content.print(mod_minutes);
-  content.print(F(" mins, "));
-  content.print(mod_seconds);
-  content.print(F(" secs"));
+  chunked.print(days);
+  chunked.print(F(" days, "));
+  chunked.print(mod_hours);
+  chunked.print(F(" hours, "));
+  chunked.print(mod_minutes);
+  chunked.print(F(" mins, "));
+  chunked.print(mod_seconds);
+  chunked.print(F(" secs"));
 #endif /* ENABLE_EXTRA_DIAG */
 
-  content.print(F("<tr><td>RS485 Data:<td>"));
-  content.print(serialTxCount);
-  content.print(F(" Tx bytes / "));
-  content.print(serialRxCount);
-  content.print(F(" Rx bytes"
+  chunked.print(F("<tr><td>RS485 Data:<td>"));
+  chunked.print(serialTxCount);
+  chunked.print(F(" Tx bytes / "));
+  chunked.print(serialRxCount);
+  chunked.print(F(" Rx bytes"
                   "<tr><td>Ethernet Data:<td>"));
-  content.print(ethTxCount);
-  content.print(F(" Tx bytes / "));
-  content.print(ethRxCount);
-  content.print(F(" Rx bytes  (excl. WebUI)"));
+  chunked.print(ethTxCount);
+  chunked.print(F(" Tx bytes / "));
+  chunked.print(ethRxCount);
+  chunked.print(F(" Rx bytes  (excl. WebUI)"));
 
 #ifdef ENABLE_EXTRA_DIAG
-  content.print(F("<tr><td colspan=2>"
+  chunked.print(F("<tr><td colspan=2>"
                   "<table style=border-collapse:collapse;text-align:center>"
                   "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
   for (byte i = 0; i < maxSockNum ; i++) {
     EthernetClient clientDiag = EthernetClient(i);
-    content.print(F("<tr><td>Socket "));
-    content.print(i);
-    content.print(F(":<td>"));
+    chunked.print(F("<tr><td>Socket "));
+    chunked.print(i);
+    chunked.print(F(":<td>"));
     switch (W5100.readSnMR(i)) {
       case SnMR::CLOSE:
-        content.print(F("CLOSE"));
+        chunked.print(F("CLOSE"));
         break;
       case SnMR::TCP:
-        content.print(F("TCP"));
+        chunked.print(F("TCP"));
         break;
       case SnMR::UDP:
-        content.print(F("UDP"));
+        chunked.print(F("UDP"));
         break;
       case SnMR::IPRAW:
-        content.print(F("IPRAW"));
+        chunked.print(F("IPRAW"));
         break;
       case SnMR::MACRAW:
-        content.print(F("MACRAW"));
+        chunked.print(F("MACRAW"));
         break;
       case SnMR::PPPOE:
-        content.print(F("PPPOE"));
+        chunked.print(F("PPPOE"));
         break;
       case SnMR::ND:
-        content.print(F("ND"));
+        chunked.print(F("ND"));
         break;
       case SnMR::MULTI:
-        content.print(F("MULTI"));
+        chunked.print(F("MULTI"));
         break;
       default:
         break;
     }
-    content.print(F("<td>"));
+    chunked.print(F("<td>"));
     switch (clientDiag.status()) {
       case SnSR::CLOSED:
-        content.print(F("CLOSED"));
+        chunked.print(F("CLOSED"));
         break;
       case SnSR::INIT:
-        content.print(F("INIT"));
+        chunked.print(F("INIT"));
         break;
       case SnSR::LISTEN:
-        content.print(F("LISTEN"));
+        chunked.print(F("LISTEN"));
         break;
       case SnSR::SYNSENT:
-        content.print(F("SYNSENT"));
+        chunked.print(F("SYNSENT"));
         break;
       case SnSR::SYNRECV:
-        content.print(F("SYNRECV"));
+        chunked.print(F("SYNRECV"));
         break;
       case SnSR::ESTABLISHED:
-        content.print(F("ESTABLISHED"));
+        chunked.print(F("ESTABLISHED"));
         break;
       case SnSR::FIN_WAIT:
-        content.print(F("FIN_WAIT"));
+        chunked.print(F("FIN_WAIT"));
         break;
       case SnSR::CLOSING:
-        content.print(F("CLOSING"));
+        chunked.print(F("CLOSING"));
         break;
       case SnSR::TIME_WAIT:
-        content.print(F("TIME_WAIT"));
+        chunked.print(F("TIME_WAIT"));
         break;
       case SnSR::CLOSE_WAIT:
-        content.print(F("CLOSE_WAIT"));
+        chunked.print(F("CLOSE_WAIT"));
         break;
       case SnSR::LAST_ACK:
-        content.print(F("LAST_ACK"));
+        chunked.print(F("LAST_ACK"));
         break;
       case SnSR::UDP:
-        content.print(F("UDP"));
+        chunked.print(F("UDP"));
         break;
       case SnSR::IPRAW:
-        content.print(F("IPRAW"));
+        chunked.print(F("IPRAW"));
         break;
       case SnSR::MACRAW:
-        content.print(F("MACRAW"));
+        chunked.print(F("MACRAW"));
         break;
       case SnSR::PPPOE:
-        content.print(F("PPPOE"));
+        chunked.print(F("PPPOE"));
         break;
       default:
         break;
     }
-    content.print(F("<td>"));
-    content.print(clientDiag.localPort());
-    content.print(F("<td>"));
-    content.print(clientDiag.remoteIP());
-    content.print(F("<td>"));
-    content.print(clientDiag.remotePort());
+    chunked.print(F("<td>"));
+    chunked.print(clientDiag.localPort());
+    chunked.print(F("<td>"));
+    chunked.print(clientDiag.remoteIP());
+    chunked.print(F("<td>"));
+    chunked.print(clientDiag.remotePort());
   }
-  content.print(F("</table>"));
+  chunked.print(F("</table>"));
 #endif /* ENABLE_EXTRA_DIAG */
 
-  content.print(F("<tr><td><br>"
+  chunked.print(F("<tr><td><br>"
                   "<tr><td>Modbus TCP/UDP Masters:"));
   byte countMasters = 0;
   for (byte i = 0; i < maxSockNum; i++) {
@@ -333,263 +333,263 @@ void contentStatus(ChunkedPrint& content)
     IPAddress ipTemp = clientDiag.remoteIP();
     if (ipTemp != 0 && ipTemp != 0xFFFFFFFF) {
       if (clientDiag.status() == SnSR::UDP && clientDiag.localPort() == localConfig.udpPort) {
-        content.print(F("<td><tr><td>UDP:<td>"));
-        content.print(ipTemp);
+        chunked.print(F("<td><tr><td>UDP:<td>"));
+        chunked.print(ipTemp);
         countMasters++;
       } else if (clientDiag.localPort() == localConfig.tcpPort) {
-        content.print(F("<td><tr><td>TCP:<td>"));
-        content.print(ipTemp);
+        chunked.print(F("<td><tr><td>TCP:<td>"));
+        chunked.print(ipTemp);
         countMasters++;
       }
     }
   }
-  if (countMasters == 0) content.print(F("<td>none"));
-  content.print(F("<tr><td><br>"
+  if (countMasters == 0) chunked.print(F("<td>none"));
+  chunked.print(F("<tr><td><br>"
                   "<tr><td>Modbus RTU Slaves:<td><button name="));
-  content.print(POST_ACTION);
-  content.print(F(" value="));
-  content.print(SCAN);
-  content.print(F(">Scan</button>"));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(SCAN);
+  chunked.print(F(">Scan</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
     if (getSlaveResponding(k) == true || k == scanCounter) {
-      content.print(F("<tr><td><td>0x"));
-      if (k < 16) content.print(F("0"));
-      content.print(k, HEX);
+      chunked.print(F("<tr><td><td>0x"));
+      if (k < 16) chunked.print(F("0"));
+      chunked.print(k, HEX);
       if (getSlaveResponding(k) == true) {
-        content.print(F(" OK"));
+        chunked.print(F(" OK"));
         countSlaves++;
       }
-      else content.print(F(" scanning..."));
+      else chunked.print(F(" scanning..."));
     }
   }
-  if (countSlaves == 0 && scanCounter == 0) content.print(F("<tr><td><td>none"));
+  if (countSlaves == 0 && scanCounter == 0) chunked.print(F("<tr><td><td>none"));
 }
 
 
 //            IP Settings
-void contentIp(ChunkedPrint& content)
+void contentIp(ChunkedPrint &chunked)
 {
 #ifdef ENABLE_DHCP
-  content.print(F("<tr><td>Auto IP:"
+  chunked.print(F("<tr><td>Auto IP:"
                   "<td><input type=hidden name="));
-  content.print(POST_DHCP);
-  content.print(F("value=0>"
+  chunked.print(POST_DHCP);
+  chunked.print(F(" value=0>"
                   "<input type=checkbox id=box name="));
-  content.print(POST_DHCP);
-  content.print(F("onclick=dis(this.checked) value=1"));
-  if (localConfig.enableDhcp) content.print(F(" checked"));
-  content.print(F(">Enable DHCP"));
+  chunked.print(POST_DHCP);
+  chunked.print(F(" onclick=dis(this.checked) value=1"));
+  if (localConfig.enableDhcp) chunked.print(F(" checked"));
+  chunked.print(F(">Enable DHCP"));
 #endif /* ENABLE_DHCP */
   for (byte j = 0; j < 4; j++) {
-    content.print(F("<tr><td>"));
+    chunked.print(F("<tr><td>"));
     switch (j) {
       case 0:
-        content.print(F("Static IP"));
+        chunked.print(F("Static IP"));
         break;
       case 1:
-        content.print(F("Submask"));
+        chunked.print(F("Submask"));
         break;
       case 2:
-        content.print(F("Gateway"));
+        chunked.print(F("Gateway"));
         break;
       case 3:
-        content.print(F("DNS Server"));
+        chunked.print(F("DNS Server"));
         break;
       default:
         break;
     }
-    content.print(F(":<td>"));
+    chunked.print(F(":<td>"));
     for (byte i = 0; i < 4; i++) {
-      content.print(F("<input name="));
-      content.print(POST_IP + i + (j * 4));
-      content.print(F(" type=tel class=ip required maxlength=3 size=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
+      chunked.print(F("<input name="));
+      chunked.print(POST_IP + i + (j * 4));
+      chunked.print(F(" type=tel class=ip required maxlength=3 size=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
       switch (j) {
         case 0:
-          content.print(localConfig.ip[i]);
+          chunked.print(localConfig.ip[i]);
           break;
         case 1:
-          content.print(localConfig.subnet[i]);
+          chunked.print(localConfig.subnet[i]);
           break;
         case 2:
-          content.print(localConfig.gateway[i]);
+          chunked.print(localConfig.gateway[i]);
           break;
         case 3:
-          content.print(localConfig.dns[i]);
+          chunked.print(localConfig.dns[i]);
           break;
         default:
           break;
       }
-      content.print(F(">"));
-      if (i < 3) content.print(F("."));
+      chunked.print(F(">"));
+      if (i < 3) chunked.print(F("."));
     }
   }
 }
 
 //            TCP/UDP Settings
-void contentTcp(ChunkedPrint& content)
+void contentTcp(ChunkedPrint &chunked)
 {
   for (byte i = 0; i < 3; i++) {
-    content.print(F("<tr><td>"));
+    chunked.print(F("<tr><td>"));
     switch (i) {
       case 0:
-        content.print(F("Modbus TCP"));
+        chunked.print(F("Modbus TCP"));
         break;
       case 1:
-        content.print(F("Modbus UDP"));
+        chunked.print(F("Modbus UDP"));
         break;
       case 2:
-        content.print(F("Web"));
+        chunked.print(F("Web"));
         break;
       default:
         break;
     }
-    content.print(F(" Port:"));
-    helperInput(content);
-    content.print(POST_TCP + i);
-    content.print(F(" min=1 max=65535 value="));
+    chunked.print(F(" Port:"));
+    helperInput(chunked);
+    chunked.print(POST_TCP + i);
+    chunked.print(F(" min=1 max=65535 value="));
     switch (i) {
       case 0:
-        content.print(localConfig.tcpPort);
+        chunked.print(localConfig.tcpPort);
         break;
       case 1:
-        content.print(localConfig.udpPort);
+        chunked.print(localConfig.udpPort);
         break;
       case 2:
-        content.print(localConfig.webPort);
+        chunked.print(localConfig.webPort);
         break;
       default:
         break;
     }
-    content.print(F(">"));
+    chunked.print(F(">"));
   }
-  content.print(F("<tr><td>Modbus Mode:<td><select name="));
-  content.print(POST_RTU_OVER);
-  content.print(F(">"));
+  chunked.print(F("<tr><td>Modbus Mode:<td><select name="));
+  chunked.print(POST_RTU_OVER);
+  chunked.print(F(">"));
   for (byte i = 0; i < 2; i++) {
-    content.print(F("<option value="));
-    content.print(i);
-    if (localConfig.enableRtuOverTcp == i) content.print(F(" selected"));
-    content.print(F(">"));
+    chunked.print(F("<option value="));
+    chunked.print(i);
+    if (localConfig.enableRtuOverTcp == i) chunked.print(F(" selected"));
+    chunked.print(F(">"));
     switch (i) {
       case 0:
-        content.print(F("Modbus TCP/UDP"));
+        chunked.print(F("Modbus TCP/UDP"));
         break;
       case 1:
-        content.print(F("Modbus RTU over TCP/UDP"));
+        chunked.print(F("Modbus RTU over TCP/UDP"));
         break;
       default:
         break;
     }
-    content.print(F("</option>"));
+    chunked.print(F("</option>"));
   }
-  content.print(F("</select>"));
+  chunked.print(F("</select>"));
 }
 
 //            RS485 Settings
-void contentRtu(ChunkedPrint& content)
+void contentRtu(ChunkedPrint &chunked)
 {
-  content.print(F("<tr><td>Baud Rate:"));
-  helperInput(content);
-  content.print(POST_BAUD);
-  content.print(F(" min=300 max=250000 value="));
-  content.print(localConfig.baud);
-  content.print(F("> (300~250000) bps"
+  chunked.print(F("<tr><td>Baud Rate:"));
+  helperInput(chunked);
+  chunked.print(POST_BAUD);
+  chunked.print(F(" min=300 max=250000 value="));
+  chunked.print(localConfig.baud);
+  chunked.print(F("> (300~250000) bps"
                   "<tr><td>Data Bits:<td><select name="));
-  content.print(POST_DATA);
-  content.print(F(">"));
+  chunked.print(POST_DATA);
+  chunked.print(F(">"));
   for (byte i = 5; i <= 8; i++) {
-    content.print(F("<option value="));
-    content.print(i);
-    if ((((localConfig.serialConfig & 0x06) >> 1) + 5) == i) content.print(F(" selected"));
-    content.print(F(">"));
-    content.print(i);
-    content.print(F("</option>"));
+    chunked.print(F("<option value="));
+    chunked.print(i);
+    if ((((localConfig.serialConfig & 0x06) >> 1) + 5) == i) chunked.print(F(" selected"));
+    chunked.print(F(">"));
+    chunked.print(i);
+    chunked.print(F("</option>"));
   }
-  content.print(F("</select> bit"
+  chunked.print(F("</select> bit"
                   "<tr><td>Parity:<td>"
                   "<select name="));
-  content.print(POST_PARITY);
-  content.print(F(">"));
+  chunked.print(POST_PARITY);
+  chunked.print(F(">"));
   for (byte i = 0; i <= 3; i++) {
     if (i == 1) continue;       // invalid value, skip and continue for loop
-    content.print(F("<option value="));
-    content.print(i);
-    if (((localConfig.serialConfig & 0x30) >> 4) == i) content.print(F(" selected"));
-    content.print(F(">"));
+    chunked.print(F("<option value="));
+    chunked.print(i);
+    if (((localConfig.serialConfig & 0x30) >> 4) == i) chunked.print(F(" selected"));
+    chunked.print(F(">"));
     switch (i) {
       case 0:
-        content.print(F("None"));
+        chunked.print(F("None"));
         break;
       case 2:
-        content.print(F("Even"));
+        chunked.print(F("Even"));
         break;
       case 3:
-        content.print(F("Odd"));
+        chunked.print(F("Odd"));
         break;
       default:
         break;
     }
-    content.print(F("</option>"));
+    chunked.print(F("</option>"));
   }
-  content.print(F("</select>"
+  chunked.print(F("</select>"
                   "<tr><td>Stop Bits:<td><select name="));
-  content.print(POST_STOP);
-  content.print(F(">"));
+  chunked.print(POST_STOP);
+  chunked.print(F(">"));
   for (byte i = 1; i <= 2; i++) {
-    content.print(F("<option value="));
-    content.print(i);
-    if ((((localConfig.serialConfig & 0x08) >> 3) + 1) == i) content.print(F(" selected"));
-    content.print(F(">"));
-    content.print(i);
-    content.print(F("</option>"));
+    chunked.print(F("<option value="));
+    chunked.print(i);
+    if ((((localConfig.serialConfig & 0x08) >> 3) + 1) == i) chunked.print(F(" selected"));
+    chunked.print(F(">"));
+    chunked.print(i);
+    chunked.print(F("</option>"));
   }
-  content.print(F("</select> bit"
+  chunked.print(F("</select> bit"
                   "<tr><td>Response Timeout:"));
-  helperInput(content);
-  content.print(POST_TIMEOUT);
-  content.print(F(" min=100 max=9999 value="));
-  content.print(localConfig.serialTimeout);
-  content.print(F("> (100~9999) ms"
+  helperInput(chunked);
+  chunked.print(POST_TIMEOUT);
+  chunked.print(F(" min=100 max=9999 value="));
+  chunked.print(localConfig.serialTimeout);
+  chunked.print(F("> (100~9999) ms"
                   "<tr><td>Retry Attempts:"));
-  helperInput(content);
-  content.print(POST_RETRY);
-  content.print(F(" min=1 max=10 value="));
-  content.print(localConfig.serialRetry);
-  content.print(F("> (1~10)"));
+  helperInput(chunked);
+  chunked.print(POST_RETRY);
+  chunked.print(F(" min=1 max=10 value="));
+  chunked.print(localConfig.serialRetry);
+  chunked.print(F("> (1~10)"));
 }
 
 //        Tools
-void contentTools(ChunkedPrint& content)
+void contentTools(ChunkedPrint &chunked)
 {
-  content.print(F("<tr><td>Factory Defaults:<td><button name="));
-  content.print(POST_ACTION);
-  content.print(F(" value="));
-  content.print(FACTORY);
-  content.print(F(">Restore</button> (Static IP: "));
-  content.print((IPAddress)defaultConfig.ip);
-  content.print(F(")"
+  chunked.print(F("<tr><td>Factory Defaults:<td><button name="));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(FACTORY);
+  chunked.print(F(">Restore</button> (Static IP: "));
+  chunked.print((IPAddress)defaultConfig.ip);
+  chunked.print(F(")"
                   "<tr><td>MAC Address: <td><button name="));
-  content.print(POST_ACTION);
-  content.print(F(" value="));
-  content.print(MAC);
-  content.print(F(">Generate New</button>"
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(MAC);
+  chunked.print(F(">Generate New</button>"
                   "<tr><td>Microcontroller: <td><button name="));
-  content.print(POST_ACTION);
-  content.print(F(" value="));
-  content.print(REBOOT);
-  content.print(F(">Reboot</button>"));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(REBOOT);
+  chunked.print(F(">Reboot</button>"));
 }
 
-void contentWait(ChunkedPrint& content)
+void contentWait(ChunkedPrint &chunked)
 {
-  content.print(F("<tr><td><td><br>Reloading. Please wait..."));
+  chunked.print(F("<tr><td><td><br>Reloading. Please wait..."));
 }
 
 // Functions providing snippets of repetitive HTML code
-void helperInput(ChunkedPrint& helper)
+void helperInput(ChunkedPrint &chunked)
 {
-  helper.print(F("<td><input size=7 required type=number name="));
+  chunked.print(F("<td><input size=7 required type=number name="));
 }
 
 void send404(EthernetClient &client)

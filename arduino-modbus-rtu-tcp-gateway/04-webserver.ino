@@ -205,10 +205,11 @@ void processPost(char postParameter[]) {
     char *sav2 = NULL;            // for inner strtok_r
     paramKey = strtok_r(point, "=", &sav2);   // inner strtok_r, use sav2
     paramValue = strtok_r(NULL, "=", &sav2);
-    if (!paramValue) continue;
+    point = strtok_r(NULL, "&", &sav1);
+    if (!paramValue)
+      continue;      // do not process POST parameter if there is no parameter value
     byte paramKeyByte = atoi(paramKey);
     unsigned long paramValueUlong = atol(paramValue);
-
     switch (paramKeyByte) {
       case POST_NONE:                     // reserved, because atoi / atol returns NULL in case of error
         break;
@@ -307,7 +308,6 @@ void processPost(char postParameter[]) {
       default:
         break;
     }
-    point = strtok_r(NULL, "&", &sav1);
   }     // while (point != NULL)
   switch (action) {
     case FACTORY:

@@ -35,10 +35,11 @@
   v2.3 2021-09-10 Fix IPAddress cast (gateway freeze)
   v2.4 2021-10-15 Add SW version. Forced factory reset (load defaut settings from sketch) on MAJOR version change.
   v3.0 2021-11-07 Improve POST parameters processing, bugfix 404 and 204 error headers. 
+  v3.1 2022-01-28 Code optimization, bugfix DHCP settings.
 
 */
 
-const byte version[] = {3, 0};
+const byte version[] = {3, 1};
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -66,6 +67,11 @@ const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent duri
 
 // #define DEBUG            // Main Serial (USB) is used for printing some debug info, not for Modbus RTU. At the moment, only web server related debug messages are printed.
 #define debugSerial Serial
+
+#ifdef MAX_SOCK_NUM           //if the macro MAX_SOCK_NUM is defined 
+// #undef MAX_SOCK_NUM           //un-define it
+// #define MAX_SOCK_NUM 8        //redefine it with the new value
+#endif 
 
 /****** EXTRA FUNCTIONS ******/
 
@@ -124,7 +130,11 @@ const byte configStart = 128;
 
 /****** ETHERNET AND SERIAL ******/
 
-#define UDP_TX_PACKET_MAX_SIZE modbusSize
+#ifdef UDP_TX_PACKET_MAX_SIZE               //if the macro MAX_SOCK_NUM is defined 
+#undef UDP_TX_PACKET_MAX_SIZE               //un-define it
+#define UDP_TX_PACKET_MAX_SIZE modbusSize   //redefine it with the new value
+#endif 
+
 byte maxSockNum = MAX_SOCK_NUM;
 
 bool dhcpSuccess = false;
@@ -238,7 +248,7 @@ void setup()
   }
 
 #ifdef DEBUG
-  debugSerial.begin(baud);
+  debugSerial.begin(localConfig.baud);    // same baud as RS485
 #endif /* DEBUG */
 
   startSerial();

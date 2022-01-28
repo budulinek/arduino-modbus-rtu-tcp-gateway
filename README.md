@@ -56,6 +56,7 @@ Get the hardware (cheap clones from China are sufficient) and connect together:
       Rx0 <-> RO<br>
       Pin 6 <-> DE,RE
       
+
 Here is my setup:
 Terminal shield + Arduino Nano + W5500 eth shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
 <img src="/pics/HW.jpg" alt="01" style="zoom:100%;" />
@@ -93,7 +94,7 @@ The code was tested on Arduino Nano, Uno and Mega, ethernet chips W5100 and W550
 
 #### Ethernet socket
 
-The default Ethernet.h library determines MAX_SOCK_NUM by microcontroller RAM (not by Ethernet chip type). So if you use W5500 (which has 8 sockets available) on Arduino Nano, only 4 sockets will be used. If you want to force the library to use 8 sockets, edit https://github.com/arduino-libraries/Ethernet/blob/master/src/Ethernet.h#L36 
+The default Ethernet.h library determines MAX_SOCK_NUM by microcontroller RAM (not by Ethernet chip type). So if you use W5500 (which has 8 sockets available) on Arduino Nano, only 4 sockets will be used. If you want to force the library to use 8 sockets, redefine MAX_SOCK_NUM in advanced settings in the sketch.
 
 #### Memory
 
