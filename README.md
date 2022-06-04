@@ -111,4 +111,4 @@ Not everything could fit into the limited flash memory of Arduino Nano / Uno. If
 ## Version history
 
 For version history see: 
-https://github.com/budulinek/arduino-modbus-rtu-tcp-gateway/blob/329600af6ca6f27cd92ae5ce825efd023a771fa8/arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino#L27
+https://github.com/budulinek/arduino-modbus-rtu-tcp-gateway/blob/master/arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino#L27
