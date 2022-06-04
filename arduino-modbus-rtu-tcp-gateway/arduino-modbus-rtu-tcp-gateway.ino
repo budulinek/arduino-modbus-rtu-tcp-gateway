@@ -36,10 +36,11 @@
   v2.4 2021-10-15 Add SW version. Forced factory reset (load defaut settings from sketch) on MAJOR version change.
   v3.0 2021-11-07 Improve POST parameters processing, bugfix 404 and 204 error headers. 
   v3.1 2022-01-28 Code optimization, bugfix DHCP settings.
+  v3.2 2022-06-04 Reduce program size (so that it fits on Nano), ethernet data counter only available when ENABLE_EXTRA_DIAG.
 
 */
 
-const byte version[] = {3, 1};
+const byte version[] = {3, 2};
 
 #include <SPI.h>
 #include <Ethernet.h>

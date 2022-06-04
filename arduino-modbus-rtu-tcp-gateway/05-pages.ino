@@ -221,15 +221,15 @@ void contentStatus(ChunkedPrint &chunked)
   chunked.print(serialTxCount);
   chunked.print(F(" Tx bytes / "));
   chunked.print(serialRxCount);
-  chunked.print(F(" Rx bytes"
-                  "<tr><td>Ethernet Data:<td>"));
+  chunked.print(F(" Rx bytes"));
+
+#ifdef ENABLE_EXTRA_DIAG
+  chunked.print(F("<tr><td>Ethernet Data:<td>"));
   chunked.print(ethTxCount);
   chunked.print(F(" Tx bytes / "));
   chunked.print(ethRxCount);
-  chunked.print(F(" Rx bytes  (excl. WebUI)"));
-
-#ifdef ENABLE_EXTRA_DIAG
-  chunked.print(F("<tr><td colspan=2>"
+  chunked.print(F(" Rx bytes  (excl. WebUI)"
+                  "<tr><td colspan=2>"
                   "<table style=border-collapse:collapse;text-align:center>"
                   "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
   for (byte i = 0; i < maxSockNum ; i++) {

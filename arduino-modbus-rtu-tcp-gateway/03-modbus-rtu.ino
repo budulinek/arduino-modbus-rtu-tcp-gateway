@@ -105,8 +105,10 @@ void recvSerial()
           Udp.write(serialIn, rxNdx - 2);      //send without CRC
         }
         Udp.endPacket();
+#ifdef ENABLE_EXTRA_DIAG
         ethTxCount += rxNdx;
         if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
       } else if (queueHeaders.first().clientNum != SCAN_REQUEST) {
         EthernetClient client = EthernetClient(queueHeaders.first().clientNum);
         // make sure that this is really our socket
@@ -116,8 +118,10 @@ void recvSerial()
             client.write(MBAP, 6);
             client.write(serialIn, rxNdx - 2);      //send without CRC
           }
+#ifdef ENABLE_EXTRA_DIAG
           ethTxCount += rxNdx;
           if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
         }
       }
       deleteRequest();
@@ -150,8 +154,10 @@ void recvSerial()
           Udp.write(highByte(crc));
         }
         Udp.endPacket();
+#ifdef ENABLE_EXTRA_DIAG
         ethTxCount += 5;
         if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
       } else {
         EthernetClient client = EthernetClient(queueHeaders.first().clientNum);
         // make sure that this is really our socket
@@ -164,8 +170,10 @@ void recvSerial()
             client.write(lowByte(crc));        // send CRC, low byte first
             client.write(highByte(crc));
           }
+#ifdef ENABLE_EXTRA_DIAG
           ethTxCount += 5;
           if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
         }
       }
       deleteRequest();

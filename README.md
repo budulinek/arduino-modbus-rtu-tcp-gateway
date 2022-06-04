@@ -104,6 +104,6 @@ Not everything could fit into the limited flash memory of Arduino Nano / Uno. If
 
 <img src="/pics/modbus6.png" alt="06" style="zoom:100%;" />
 
-* #define ENABLE_EXTRA_DIAG  shows extra info on "Current status" page: per socket diagnostics, run time counter.
+* #define ENABLE_EXTRA_DIAG  shows extra info on "Current status" page: per socket diagnostics, run time counter, ethernet data counter.
 
 <img src="/pics/modbus1x.png" alt="01x" style="zoom:100%;" />

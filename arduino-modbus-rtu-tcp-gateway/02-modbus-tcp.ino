@@ -87,8 +87,10 @@ void recvUdp()
         Udp.write(highByte(crc));
       }
       Udp.endPacket();
+#ifdef ENABLE_EXTRA_DIAG
       ethTxCount += 5;
       if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
     }
   }
 }
@@ -133,8 +135,10 @@ void recvTcp()
         client.write(lowByte(crc));        // send CRC, low byte first
         client.write(highByte(crc));
       }
+#ifdef ENABLE_EXTRA_DIAG
       ethTxCount += 5;
       if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
     }
   }
 }
