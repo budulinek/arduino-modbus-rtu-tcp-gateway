@@ -107,3 +107,8 @@ Not everything could fit into the limited flash memory of Arduino Nano / Uno. If
 * #define ENABLE_EXTRA_DIAG  shows extra info on "Current status" page: per socket diagnostics, run time counter, ethernet data counter.
 
 <img src="/pics/modbus1x.png" alt="01x" style="zoom:100%;" />
+
+## Version history
+
+For version history see: 
+https://github.com/budulinek/arduino-modbus-rtu-tcp-gateway/blob/329600af6ca6f27cd92ae5ce825efd023a771fa8/arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino#L27
