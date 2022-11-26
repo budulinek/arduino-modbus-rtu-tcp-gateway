@@ -37,10 +37,11 @@
   v3.0 2021-11-07 Improve POST parameters processing, bugfix 404 and 204 error headers. 
   v3.1 2022-01-28 Code optimization, bugfix DHCP settings.
   v3.2 2022-06-04 Reduce program size (so that it fits on Nano), ethernet data counter only available when ENABLE_EXTRA_DIAG.
+  v4.0 2022-11-26 Only store last 3 bytes of MAC in EEPROM,
 
 */
 
-const byte version[] = {3, 2};
+const byte version[] = {4, 0};
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -84,7 +85,7 @@ const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent duri
 
 typedef struct
 {
-  byte mac[6];
+  byte macEnd[3];
   bool enableDhcp;
   IPAddress ip;
   IPAddress subnet;
@@ -109,7 +110,7 @@ typedef struct
 */
 
 const config_type defaultConfig = {
-  { 0x90, 0xA2, 0xDA },  // mac (bytes 4, 5 and 6 will be generated randomly)
+  {},                    // macEnd (last 3 bytes)
   false,                 // enableDhcp
   {192, 168, 1, 254},    // ip
   {255, 255, 255, 0},    // subnet
@@ -139,6 +140,8 @@ const byte configStart = 128;
 byte maxSockNum = MAX_SOCK_NUM;
 
 bool dhcpSuccess = false;
+
+const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };
 
 EthernetUDP Udp;
 EthernetServer modbusServer(502);

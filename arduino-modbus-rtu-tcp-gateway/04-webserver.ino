@@ -312,10 +312,10 @@ void processPost(char postParameter[]) {
   switch (action) {
     case FACTORY:
       {
-        byte tempMac[6];
-        memcpy(tempMac, localConfig.mac, 6); // keep current MAC
+        byte tempMac[3];
+        memcpy(tempMac, localConfig.macEnd, 3); // keep current MAC
         localConfig = defaultConfig;
-        memcpy(localConfig.mac, tempMac, 6);
+        memcpy(localConfig.macEnd, tempMac, 3);
         break;
       }
     case MAC:

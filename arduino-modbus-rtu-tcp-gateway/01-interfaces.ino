@@ -65,15 +65,18 @@ void startEthernet() {
     digitalWrite(ethResetPin, HIGH);
     delay(500);
   }
+  byte mac[6];
+  memcpy(mac, MAC_START, 3); // set first 3 bytes
+  memcpy(mac + 3, localConfig.macEnd, 3); // set last 3 bytes
 #ifdef ENABLE_DHCP
   if (localConfig.enableDhcp) {
-    dhcpSuccess = Ethernet.begin(localConfig.mac);
+    dhcpSuccess = Ethernet.begin(mac);
   }
   if (!localConfig.enableDhcp || dhcpSuccess == false) {
-    Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+    Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
   }
 #else /* ENABLE_DHCP */
-  Ethernet.begin(localConfig.mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+  Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
   localConfig.enableDhcp = false;                 // Make sure Dhcp is disabled in config
 #endif /* ENABLE_DHCP */
   modbusServer = EthernetServer(localConfig.tcpPort);
@@ -143,7 +146,7 @@ void generateMac()
   uint32_t randomBuffer = (seed1 << 16) + seed2;  /* 32-bit random */
 
   for (byte i = 0; i < 3; i++) {
-    localConfig.mac[i + 3] = randomBuffer & 0xFF;
+    localConfig.macEnd[i] = randomBuffer & 0xFF;
     randomBuffer >>= 8;
   }
 }
