@@ -23,12 +23,11 @@
 
    ***************************************************************** */
 
-const byte webOutBufferSize = 128;               // size of web server write buffer (used by StreamLib)
+const byte webOutBufferSize = 128;  // size of web server write buffer (used by StreamLib)
 
-void sendPage(EthernetClient &client, byte reqPage)
-{
+void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[webOutBufferSize];
-  ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer)); // the StreamLib object to replace client print
+  ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
   dbgln(F("[web out] 200 response send"));
   chunked.print(F("HTTP/1.1 200 OK\r\n"
                   "Connection: close\r\n"
@@ -36,12 +35,12 @@ void sendPage(EthernetClient &client, byte reqPage)
                   "Transfer-Encoding: chunked\r\n"
                   "\r\n"));
   chunked.begin();
-  chunked.print(F("<!doctype html>"            // the start of the HTTP Body - contains the HTML
+  chunked.print(F("<!doctype html>"  // the start of the HTTP Body - contains the HTML
                   "<html lang=en>"
                   "<head>"
                   "<meta charset=utf-8"));
   if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
-  if (reqPage == PAGE_WAIT) {                                 // redirect to new IP and web port
+  if (reqPage == PAGE_WAIT) {  // redirect to new IP and web port
     chunked.print(F(";url=http://"));
     chunked.print((IPAddress)localConfig.ip);
     chunked.print(F(":"));
@@ -65,7 +64,7 @@ void sendPage(EthernetClient &client, byte reqPage)
                   "<table height=100% style='position:absolute;top:0;bottom:0;left:0;right:0'>"
                   "<tr style='height:10px'><th colspan=2>"
                   "<h1 style='margin:0px'>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
-                  "<tr>"                                           // second row is left menu (first cell) and main page (second cell)
+                  "<tr>"                                                                  // second row is left menu (first cell) and main page (second cell)
                   "<th valign=top style=width:20%;padding:0px>"
 
                   // Left Menu
@@ -153,8 +152,7 @@ void menuItem(ChunkedPrint &chunked, byte item) {
 }
 
 //        Current Status
-void contentStatus(ChunkedPrint &chunked)
-{
+void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>SW Version:<td>"));
   chunked.print(version[0], HEX);
   chunked.print(F("."));
@@ -172,7 +170,7 @@ void contentStatus(ChunkedPrint &chunked)
     case EthernetW5500:
       chunked.print(F("W5500"));
       break;
-    default:        // TODO: add W6100 once it is included in Ethernet library
+    default:  // TODO: add W6100 once it is included in Ethernet library
       chunked.print(F("unknown"));
       break;
   }
@@ -232,7 +230,7 @@ void contentStatus(ChunkedPrint &chunked)
                   "<tr><td colspan=2>"
                   "<table style=border-collapse:collapse;text-align:center>"
                   "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
-  for (byte i = 0; i < maxSockNum ; i++) {
+  for (byte i = 0; i < maxSockNum; i++) {
     EthernetClient clientDiag = EthernetClient(i);
     chunked.print(F("<tr><td>Socket "));
     chunked.print(i);
@@ -359,8 +357,7 @@ void contentStatus(ChunkedPrint &chunked)
       if (getSlaveResponding(k) == true) {
         chunked.print(F(" OK"));
         countSlaves++;
-      }
-      else chunked.print(F(" scanning..."));
+      } else chunked.print(F(" scanning..."));
     }
   }
   if (countSlaves == 0 && scanCounter == 0) chunked.print(F("<tr><td><td>none"));
@@ -368,8 +365,7 @@ void contentStatus(ChunkedPrint &chunked)
 
 
 //            IP Settings
-void contentIp(ChunkedPrint &chunked)
-{
+void contentIp(ChunkedPrint &chunked) {
 #ifdef ENABLE_DHCP
   chunked.print(F("<tr><td>Auto IP:"
                   "<td><input type=hidden name="));
@@ -427,8 +423,7 @@ void contentIp(ChunkedPrint &chunked)
 }
 
 //            TCP/UDP Settings
-void contentTcp(ChunkedPrint &chunked)
-{
+void contentTcp(ChunkedPrint &chunked) {
   for (byte i = 0; i < 3; i++) {
     chunked.print(F("<tr><td>"));
     switch (i) {
@@ -487,8 +482,7 @@ void contentTcp(ChunkedPrint &chunked)
 }
 
 //            RS485 Settings
-void contentRtu(ChunkedPrint &chunked)
-{
+void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>Baud Rate:"));
   helperInput(chunked);
   chunked.print(POST_BAUD);
@@ -512,7 +506,7 @@ void contentRtu(ChunkedPrint &chunked)
   chunked.print(POST_PARITY);
   chunked.print(F(">"));
   for (byte i = 0; i <= 3; i++) {
-    if (i == 1) continue;       // invalid value, skip and continue for loop
+    if (i == 1) continue;  // invalid value, skip and continue for loop
     chunked.print(F("<option value="));
     chunked.print(i);
     if (((localConfig.serialConfig & 0x30) >> 4) == i) chunked.print(F(" selected"));
@@ -560,8 +554,7 @@ void contentRtu(ChunkedPrint &chunked)
 }
 
 //        Tools
-void contentTools(ChunkedPrint &chunked)
-{
+void contentTools(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>Factory Defaults:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
@@ -581,19 +574,16 @@ void contentTools(ChunkedPrint &chunked)
   chunked.print(F(">Reboot</button>"));
 }
 
-void contentWait(ChunkedPrint &chunked)
-{
+void contentWait(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td><td><br>Reloading. Please wait..."));
 }
 
 // Functions providing snippets of repetitive HTML code
-void helperInput(ChunkedPrint &chunked)
-{
+void helperInput(ChunkedPrint &chunked) {
   chunked.print(F("<td><input size=7 required type=number name="));
 }
 
-void send404(EthernetClient &client)
-{
+void send404(EthernetClient &client) {
   dbgln(F("[web out] response 404 file not found"));
   client.println(F("HTTP/1.1 404 Not Found\r\n"
                    "Content-Length: 0"));
@@ -601,8 +591,7 @@ void send404(EthernetClient &client)
 }
 
 
-void send204(EthernetClient &client)
-{
+void send204(EthernetClient &client) {
   dbgln(F("[web out] response 204 no content"));
   client.println(F("HTTP/1.1 204 No content"));
   client.stop();
