@@ -547,7 +547,7 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F(" min=100 max=2000 value="));
   chunked.print(localConfig.serialTimeout);
   chunked.print(F("> (100~2000) ms"
-                  "<tr><td>Retry Attempts:"));
+                  "<tr><td>Attempts:"));
   helperInput(chunked);
   chunked.print(POST_ATTEMPTS);
   chunked.print(F(" min=1 max=5 value="));

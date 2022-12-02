@@ -149,7 +149,7 @@ void processRequests() {
   if (scanCounter != 0 && queueHeaders.available() > 1 && queuePDUs.available() > 1) {
     // Store scan request in request queue
     queueHeaders.push(header{ { 0x00, 0x00 }, scanCounter, sizeof(scanCommand), {}, 0, SCAN_REQUEST });
-    queueRetries.push(localConfig.serialRetry - 1);  // scan requests are only sent once, so set "queueRetries" to one attempt below limit
+    queueRetries.push(localConfig.serialAttempts - 1);  // scan requests are only sent once, so set "queueRetries" to one attempt below limit
     for (byte i = 0; i < sizeof(scanCommand); i++) {
       queuePDUs.push(scanCommand[i]);
     }
