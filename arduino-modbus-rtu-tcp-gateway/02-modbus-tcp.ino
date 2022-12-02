@@ -169,14 +169,6 @@ void processRequests() {
           queueHasRespondingSlaves = false;
         }
       }
-      while (queueHasRespondingSlaves == true && getSlaveResponding(queueHeaders.first().uid) == false) {
-        // move requests to non responding slaves to the tail of the queue
-        for (byte i = 0; i < queueHeaders.first().PDUlen; i++) {
-          queuePDUs.push(queuePDUs.shift());
-        }
-        queueRetries.push(queueRetries.shift());
-        queueHeaders.push(queueHeaders.shift());
-      }
       serialState = SENDING;  // trigger sendSerial()
     }
   }
@@ -194,13 +186,6 @@ byte checkRequest(byte buffer[], unsigned int bufferSize) {
   } else {  // check MBAP header structure for Modbus TCP/UDP
     if (buffer[2] != 0x00 || buffer[3] != 0x00 || buffer[4] != 0x00 || buffer[5] != bufferSize - 6) {
       return 0xFF;  // reject: do nothing and return no error code
-    }
-  }
-  if (queueHeaders.isEmpty() == false && getSlaveResponding(address) == false) {  // allow only one request to non responding slaves
-    for (byte j = queueHeaders.size(); j > 0; j--) {                              // start searching from tail because requests to non-responsive slaves are usually towards the tail of the queue
-      if (queueHeaders[j - 1].uid == address) {
-        return 0x0B;  // return modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
-      }
     }
   }
   // check if we have space in request queue
