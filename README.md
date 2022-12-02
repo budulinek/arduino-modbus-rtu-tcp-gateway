@@ -36,9 +36,7 @@ Screenshots of the web interface:
 * supports all Modbus function codes
 * settings can be changed via web interface, stored in EEPROM
 * diagnostics and Modbus RTU scan via web interface
-* optimized queue for Modbus requests
-  - prioritization of requests to responding slaves
-  - queue will accept only one requests to non-responding slaves
+* optimized queue for Modbus requests (queue will accept only one requests to non-responding slaves)
 
 ## How can I build it myself?
 Get the hardware (cheap clones from China are sufficient) and connect together:

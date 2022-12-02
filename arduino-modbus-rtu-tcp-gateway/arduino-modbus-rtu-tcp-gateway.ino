@@ -65,19 +65,14 @@ const int modbusSize = 256;          // size of a MODBUS RTU frame (determines s
 #define mySerial Serial              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3         
 #define RS485_CONTROL_PIN 6          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
 const byte ethResetPin = 7;          // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
-const byte scanCommand[] = {0x03, 0x00, 0x00, 0x00, 0x01};  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
+const byte scanCommand[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
 
 // #define DEBUG            // Main Serial (USB) is used for printing some debug info, not for Modbus RTU. At the moment, only web server related debug messages are printed.
 #define debugSerial Serial
 
-#ifdef MAX_SOCK_NUM           //if the macro MAX_SOCK_NUM is defined 
-// #undef MAX_SOCK_NUM           //un-define it
-// #define MAX_SOCK_NUM 8        //redefine it with the new value
-#endif 
-
 /****** EXTRA FUNCTIONS ******/
 
-// these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have board with more memory
+// these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have a board with more memory
 // #define ENABLE_DHCP            // Enable DHCP (Auto IP settings)
 // #define ENABLE_EXTRA_DIAG      // Enable per socket diagnostics, run time counter
 
@@ -136,6 +131,11 @@ const byte configStart = 128;
 #undef UDP_TX_PACKET_MAX_SIZE               //un-define it
 #define UDP_TX_PACKET_MAX_SIZE modbusSize   //redefine it with the new value
 #endif 
+
+#ifdef MAX_SOCK_NUM     // Ethernet.h library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).
+#undef MAX_SOCK_NUM     // Ignore the RAM-based limitation on the number of sockets.
+#define MAX_SOCK_NUM 8  // Use all sockets supported by the ethernet chip.
+#endif
 
 byte maxSockNum = MAX_SOCK_NUM;
 
@@ -199,9 +199,11 @@ uint16_t crc;
 #define RS485_TRANSMIT    HIGH
 #define RS485_RECEIVE     LOW
 byte scanCounter = 0;
-enum state : byte
-{
-  IDLE, SENDING, DELAY, WAITING
+enum state : byte {
+  IDLE,
+  SENDING,
+  DELAY,
+  WAITING
 };
 enum state serialState;
 unsigned int charTimeout;
@@ -228,14 +230,13 @@ unsigned long ethRxCount = 0;
 #else
 unsigned int serialTxCount = 0;
 unsigned int serialRxCount = 0;
-unsigned int ethTxCount = 0;
-unsigned int ethRxCount = 0;
+// unsigned int ethTxCount = 0;
+// unsigned int ethRxCount = 0;
 #endif /* ENABLE_EXTRA_DIAG */
 
 /****** SETUP: RUNS ONCE ******/
 
-void setup()
-{
+void setup() {
   CreateTrulyRandomSeed();
 
   // is config already stored in EEPROM?
@@ -262,8 +263,7 @@ void setup()
 
 /****** LOOP ******/
 
-void loop()
-{
+void loop() {
   recvUdp();
   recvTcp();
   processRequests();

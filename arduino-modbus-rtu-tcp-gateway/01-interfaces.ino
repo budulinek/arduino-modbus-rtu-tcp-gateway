@@ -83,10 +83,8 @@ void startEthernet() {
   Udp.begin(localConfig.udpPort);
   modbusServer.begin();
   webServer.begin();
-  // Ethernet library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).
-  // Therefore, for Arduino Mega + W5100, MAX_SOCK_NUM is wrongly set to 8
   if (Ethernet.hardwareStatus() == EthernetW5100) {
-    maxSockNum = 4;
+    maxSockNum = 4;  // W5100 chip never supports more than 4 sockets
   }
   dbg(F("[arduino] Server available at http://"));
   dbgln(Ethernet.localIP());
@@ -122,14 +120,15 @@ void maintainCounters() {
   // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively
 #ifdef ENABLE_EXTRA_DIAG
   const unsigned long rollover = 0xFFFFFF00;
-#else
-  const unsigned int rollover = 0xFF00;
-#endif /* ENABLE_EXTRA_DIAG */
   if (serialTxCount > rollover || serialRxCount > rollover || ethTxCount > rollover || ethRxCount > rollover) {
-    serialRxCount = 0;
-    serialTxCount = 0;
     ethRxCount = 0;
     ethTxCount = 0;
+#else
+  const unsigned int rollover = 0xFF00;
+  if (serialTxCount > rollover || serialRxCount > rollover) {
+#endif /* ENABLE_EXTRA_DIAG */
+    serialRxCount = 0;
+    serialTxCount = 0;
   }
 }
 
@@ -139,18 +138,16 @@ void generateMac() {
   seed1 = 36969L * (seed1 & 65535L) + (seed1 >> 16);
   seed2 = 18000L * (seed2 & 65535L) + (seed2 >> 16);
   uint32_t randomBuffer = (seed1 << 16) + seed2; /* 32-bit random */
-
   for (byte i = 0; i < 3; i++) {
     localConfig.macEnd[i] = randomBuffer & 0xFF;
     randomBuffer >>= 8;
   }
 }
 
+// https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
 void CreateTrulyRandomSeed() {
   seed1 = 0;
-  nrot = 32;  // Must be at least 4, but more increased the uniformity of the produced
-  // seeds entropy.
-
+  nrot = 32;  // Must be at least 4, but more increased the uniformity of the produced seeds entropy.
   // The following five lines of code turn on the watch dog timer interrupt to create
   // the seed value
   cli();
@@ -158,10 +155,8 @@ void CreateTrulyRandomSeed() {
   _WD_CONTROL_REG |= (1 << _WD_CHANGE_BIT) | (1 << WDE);
   _WD_CONTROL_REG = (1 << WDIE);
   sei();
-
   while (nrot > 0)
     ;  // wait here until seed is created
-
   // The following five lines turn off the watch dog timer interrupt
   cli();
   MCUSR = 0;

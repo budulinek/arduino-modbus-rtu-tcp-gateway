@@ -48,7 +48,9 @@ CircularBuffer<byte, reqQueueCount> queueRetries;    // queue of retry counters
 void recvUdp() {
   unsigned int packetSize = Udp.parsePacket();
   if (packetSize) {
+#ifdef ENABLE_EXTRA_DIAG
     ethRxCount += packetSize;
+#endif /* ENABLE_EXTRA_DIAG */
     byte udpInBuffer[modbusSize + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
     // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
     // Modbus RTU frame: [0] address.....
@@ -98,7 +100,9 @@ void recvTcp() {
   EthernetClient client = modbusServer.available();
   if (client) {
     unsigned int packetSize = client.available();
+#ifdef ENABLE_EXTRA_DIAG
     ethRxCount += packetSize;
+#endif /* ENABLE_EXTRA_DIAG */
     byte tcpInBuffer[modbusSize + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
     // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
     // Modbus RTU frame: [0] address.....
