@@ -93,7 +93,7 @@ typedef struct
   unsigned long baud;
   byte serialConfig;
   unsigned int serialTimeout;
-  byte serialRetry;
+  byte serialAttempts;
 } config_type;
 
 /*
@@ -118,7 +118,7 @@ const config_type defaultConfig = {
   9600,                  // baud
   SERIAL_8E1,            // serialConfig (Modbus RTU default is 8E1, another frequently used option is 8N2)
   500,                   // serialTimeout
-  5                      // serialRetry
+  3                      // serialAttempts
 };
 // local configuration values (stored in RAM)
 config_type localConfig;
@@ -127,9 +127,9 @@ const byte configStart = 128;
 
 /****** ETHERNET AND SERIAL ******/
 
-#ifdef UDP_TX_PACKET_MAX_SIZE               //if the macro MAX_SOCK_NUM is defined 
-#undef UDP_TX_PACKET_MAX_SIZE               //un-define it
-#define UDP_TX_PACKET_MAX_SIZE modbusSize   //redefine it with the new value
+#ifdef UDP_TX_PACKET_MAX_SIZE
+#undef UDP_TX_PACKET_MAX_SIZE
+#define UDP_TX_PACKET_MAX_SIZE modbusSize
 #endif 
 
 #ifdef MAX_SOCK_NUM     // Ethernet.h library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).

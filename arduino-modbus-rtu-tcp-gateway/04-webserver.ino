@@ -77,7 +77,7 @@ enum post_key : byte {
   POST_PARITY,    // parity
   POST_STOP,      // stop bits
   POST_TIMEOUT,   // response timeout
-  POST_RETRY,     // retry attempts
+  POST_ATTEMPTS,  // number of request attempts
   POST_ACTION     // actions on Tools page
 };
 
@@ -308,8 +308,8 @@ void processPost(char postParameter[]) {
       case POST_TIMEOUT:
         localConfig.serialTimeout = paramValueUlong;
         break;
-      case POST_RETRY:
-        localConfig.serialRetry = (byte)paramValueUlong;
+      case POST_ATTEMPTS:
+        localConfig.serialAttempts = (byte)paramValueUlong;
         break;
       case POST_ACTION:
         action = (action_type)paramValueUlong;

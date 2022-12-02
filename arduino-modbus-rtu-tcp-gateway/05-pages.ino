@@ -35,8 +35,8 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "Transfer-Encoding: chunked\r\n"
                   "\r\n"));
   chunked.begin();
-  chunked.print(F("<!doctype html>"  // the start of the HTTP Body - contains the HTML
-                  "<html lang=en>"
+  chunked.print(F("<!DOCTYPE html>"
+                  "<html>"
                   "<head>"
                   "<meta charset=utf-8"));
   if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
@@ -49,23 +49,25 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F(">"
                   "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
                   "<style>"
-                  "a {text-decoration:none;color:white}"
+                  "html,body{margin:0;height:100%;font-family:sans-serif}"
+                  "a{text-decoration:none;color:white}"
                   "td:first-child {text-align:right;width:30%}"
-                  "th {text-align:left;background-color:#0067AC;color:white;padding:10px}"
-                  "table {width:100%}"
+                  "th{text-align:left;background-color:#0067AC;color:white;padding:10px;height:0}"
+                  "table{width:100%}"
+                  "h1{margin:0}"
                   "</style>"
                   "</head>"
-                  "<body style='font-family:sans-serif'"));
+                  "<body"));
 #ifdef ENABLE_DHCP
   chunked.print(F(" onload='dis(document.getElementById(&quot;box&quot;).checked)'>"
                   "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
 #endif /* ENABLE_DHCP */
   chunked.print(F(">"
-                  "<table height=100% style='position:absolute;top:0;bottom:0;left:0;right:0'>"
-                  "<tr style='height:10px'><th colspan=2>"
-                  "<h1 style='margin:0px'>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
-                  "<tr>"                                                                  // second row is left menu (first cell) and main page (second cell)
-                  "<th valign=top style=width:20%;padding:0px>"
+                  "<table height=100%>"
+                  "<tr><th colspan=2>"
+                  "<h1>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
+                  "<tr valign=top>"                                    // second row is left menu (first cell) and main page (second cell)
+                  "<th style=width:20%;padding:0>"
 
                   // Left Menu
                   "<table>"));
@@ -542,15 +544,15 @@ void contentRtu(ChunkedPrint &chunked) {
                   "<tr><td>Response Timeout:"));
   helperInput(chunked);
   chunked.print(POST_TIMEOUT);
-  chunked.print(F(" min=100 max=9999 value="));
+  chunked.print(F(" min=100 max=2000 value="));
   chunked.print(localConfig.serialTimeout);
-  chunked.print(F("> (100~9999) ms"
+  chunked.print(F("> (100~2000) ms"
                   "<tr><td>Retry Attempts:"));
   helperInput(chunked);
-  chunked.print(POST_RETRY);
-  chunked.print(F(" min=1 max=10 value="));
-  chunked.print(localConfig.serialRetry);
-  chunked.print(F("> (1~10)"));
+  chunked.print(POST_ATTEMPTS);
+  chunked.print(F(" min=1 max=5 value="));
+  chunked.print(localConfig.serialAttempts);
+  chunked.print(F("> (1~5)"));
 }
 
 //        Tools
