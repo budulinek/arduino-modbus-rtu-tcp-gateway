@@ -332,6 +332,8 @@ void processPost(char postParameter[]) {
       break;
     case SCAN:
       scanCounter = 1;
+      memset(responding, 0, sizeof(responding));   // clear status flags
+      memset(error, 0, sizeof(error));
       break;
     default:
       break;

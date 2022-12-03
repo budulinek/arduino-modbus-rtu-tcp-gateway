@@ -38,7 +38,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F("<!DOCTYPE html>"
                   "<html>"
                   "<head>"
-                  "<meta charset=utf-8"));
+                  "<meta"));
   if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
   if (reqPage == PAGE_WAIT) {  // redirect to new IP and web port
     chunked.print(F(";url=http://"));
@@ -82,7 +82,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
     menuItem(chunked, i);
     chunked.print(F("</a>"));
   }
-  chunked.print(F("</table><td valign=top style=padding:0px>"));
+  chunked.print(F("</table><td style=padding:0>"));
 
   // Main Page
   chunked.print(F("<form action=/"));
@@ -334,11 +334,11 @@ void contentStatus(ChunkedPrint &chunked) {
     if (ipTemp != 0 && ipTemp != 0xFFFFFFFF) {
       if (clientDiag.status() == SnSR::UDP && clientDiag.localPort() == localConfig.udpPort) {
         chunked.print(F("<td><tr><td>UDP:<td>"));
-        chunked.print(ipTemp);
+        chunked.print((IPAddress)ipTemp);
         countMasters++;
       } else if (clientDiag.localPort() == localConfig.tcpPort) {
         chunked.print(F("<td><tr><td>TCP:<td>"));
-        chunked.print(ipTemp);
+        chunked.print((IPAddress)ipTemp);
         countMasters++;
       }
     }
@@ -352,12 +352,15 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F(">Scan</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
-    if (getSlaveResponding(k) == true || k == scanCounter) {
+    if (getSlaveStatus(k, responding) == true || getSlaveStatus(k, error) == true || k == scanCounter) {
       chunked.print(F("<tr><td><td>0x"));
       if (k < 16) chunked.print(F("0"));
       chunked.print(k, HEX);
-      if (getSlaveResponding(k) == true) {
+      if (getSlaveStatus(k, responding) == true) {
         chunked.print(F(" OK"));
+        countSlaves++;
+      } else if (getSlaveStatus(k, error) == true) {
+        chunked.print(F(" Failed to respond"));
         countSlaves++;
       } else chunked.print(F(" scanning..."));
     }

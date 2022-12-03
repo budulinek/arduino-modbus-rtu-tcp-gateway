@@ -96,8 +96,8 @@ void recvSerial() {
     // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
     if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == myHeader.uid && serialState == WAITING) {
-      setSlaveResponding(serialIn[0], true);  // flag slave as responding
-
+      setSlaveStatus(serialIn[0], responding, true);  // flag slave as responding
+      setSlaveStatus(serialIn[0], error, false);      // flag slave as without error
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2) };
       if (myHeader.clientNum == UDP_REQUEST) {
         Udp.beginPacket(myHeader.remIP, myHeader.remPort);
@@ -113,8 +113,7 @@ void recvSerial() {
 #endif /* ENABLE_EXTRA_DIAG */
       } else if (myHeader.clientNum != SCAN_REQUEST) {
         EthernetClient client = EthernetClient(myHeader.clientNum);
-        // make sure that this is really our socket
-        if (client.localPort() == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
+        if (client.connected()) {
           if (localConfig.enableRtuOverTcp) client.write(serialIn, rxNdx);
           else {
             client.write(MBAP, 6);
@@ -137,7 +136,8 @@ void recvSerial() {
   // Deal with Serial timeouts (i.e. Modbus RTU timeouts)
   if (serialState == WAITING && requestTimeout.isOver()) {
     header myHeader = queueHeaders.first();
-    setSlaveResponding(myHeader.uid, false);                                    // flag slave as nonresponding
+    setSlaveStatus(myHeader.uid, responding, false);                                    // flag slave as nonresponding
+    if (myHeader.clientNum != SCAN_REQUEST) setSlaveStatus(myHeader.uid, error, true);  // flag slave as error
     if (queueRetries.first() >= localConfig.serialAttempts) {
       // send modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
@@ -168,8 +168,7 @@ void recvSerial() {
         default:  // Ethernet client
           {
         EthernetClient client = EthernetClient(myHeader.clientNum);
-        // make sure that this is really our socket
-        if (client.localPort() == localConfig.tcpPort && (client.status() == SnSR::ESTABLISHED || client.status() == SnSR::CLOSE_WAIT)) {
+        if (client.connected()) {
           if (!localConfig.enableRtuOverTcp) {
             client.write(MBAP, 6);
           }

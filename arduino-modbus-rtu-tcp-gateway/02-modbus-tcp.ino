@@ -21,13 +21,14 @@
    deleteRequest
    - deletes requests from queue
 
-   getSlaveResponding, setSlaveResponding
+   getSlaveStatus, setSlaveStatus
    - read from and write to bool array
 
    ***************************************************************** */
 
-// bool array for storing Modbus RTU status (responging or not responding). Array index corresponds to slave address.
-uint8_t slavesResponding[(maxSlaves + 1 + 7) / 8];
+// bool arrays for storing Modbus RTU status (responging or not responding). Array index corresponds to slave address.
+uint8_t responding[(maxSlaves + 1 + 7) / 8];
+uint8_t error[(maxSlaves + 1 + 7) / 8];
 uint8_t masks[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 typedef struct {
@@ -44,6 +45,7 @@ CircularBuffer<header, reqQueueCount> queueHeaders;  // queue of requests' heade
 CircularBuffer<byte, reqQueueSize> queuePDUs;        // queue of PDU data (function code, data)
 CircularBuffer<byte, reqQueueCount> queueRetries;    // queue of retry counters
 byte pduStart;  // first byte of Protocol Data Unit (i.e. Function code)
+
 
 void recvUdp() {
   unsigned int packetSize = Udp.parsePacket();
@@ -146,7 +148,7 @@ void processRequests() {
     if (!queueHeaders.isEmpty()) {
       boolean queueHasRespondingSlaves;  // true if  queue holds at least one request to responding slaves
       for (byte i = 0; i < queueHeaders.size(); i++) {
-        if (getSlaveResponding(queueHeaders[i].uid) == true) {
+        if (getSlaveStatus(queueHeaders[i].uid, responding) == true) {
           queueHasRespondingSlaves = true;
           break;
         } else {
@@ -194,15 +196,13 @@ void deleteRequest()  // delete request from queue
   queueRetries.shift();
 }
 
-
-bool getSlaveResponding(const uint8_t index) {
+bool getSlaveStatus(const uint8_t index, const uint8_t status[]) {
   if (index >= maxSlaves) return false;  // error
-  return (slavesResponding[index / 8] & masks[index & 7]) > 0;
+  return (status[index / 8] & masks[index & 7]) > 0;
 }
 
-
-void setSlaveResponding(const uint8_t index, const bool value) {
+void setSlaveStatus(const uint8_t index, uint8_t status[], const bool value) {
   if (index >= maxSlaves) return;  // error
-  if (value == 0) slavesResponding[index / 8] &= ~masks[index & 7];
-  else slavesResponding[index / 8] |= masks[index & 7];
+  if (value == 0) status[index / 8] &= ~masks[index & 7];
+  else status[index / 8] |= masks[index & 7];
 }
