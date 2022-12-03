@@ -32,20 +32,15 @@ void sendSerial() {
       digitalWrite(RS485_CONTROL_PIN, RS485_TRANSMIT);  // Enable RS485 Transmit
 #endif                                                  /* RS485_CONTROL_PIN */
       crc = 0xFFFF;
-      mySerial.write(myHeader.uid);  // send uid (address)
-      calculateCRC(myHeader.uid);
     }
     while (mySerial.availableForWrite() > 0 && txNdx < myHeader.PDUlen) {
-      mySerial.write(queuePDUs[txNdx]);  // send func and data
+      mySerial.write(queuePDUs[txNdx]);
       calculateCRC(queuePDUs[txNdx]);
       txNdx++;
     }
     if (mySerial.availableForWrite() > 1 && txNdx == myHeader.PDUlen) {
-      // In Modbus TCP mode we must add CRC (in Modbus RTU over TCP, CRC is already in queuePDUs)
-      if (!localConfig.enableRtuOverTcp || myHeader.clientNum == SCAN_REQUEST) {
-        mySerial.write(lowByte(crc));  // send CRC, low byte first
-        mySerial.write(highByte(crc));
-      }
+      mySerial.write(lowByte(crc));  // send CRC, low byte first
+      mySerial.write(highByte(crc));
       txNdx++;
     }
     if (mySerial.availableForWrite() == SERIAL_TX_BUFFER_SIZE - 1 && txNdx > myHeader.PDUlen) {
@@ -58,12 +53,12 @@ void sendSerial() {
     }
   } else if (serialState == DELAY && txDelay.isOver()) {
     header myHeader = queueHeaders.first();
-    serialTxCount += myHeader.PDUlen + 1;                   // in Modbus RTU over TCP, queuePDUs already contains CRC
-    if (!localConfig.enableRtuOverTcp) serialTxCount += 2;  // in Modbus TCP, add 2 bytes for CRC
+    serialTxCount += myHeader.PDUlen;
+    serialTxCount += 2;
 #ifdef RS485_CONTROL_PIN
     digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Disable RS485 Transmit
 #endif                                               /* RS485_CONTROL_PIN */
-    if (myHeader.uid == 0x00) {                      // Modbus broadcast - we do not count attempts and delete immediatelly
+    if (queuePDUs[0] == 0x00) {                      // Modbus broadcast - we do not count attempts and delete immediatelly
       serialState = IDLE;
       deleteRequest();
     } else {
@@ -95,7 +90,7 @@ void recvSerial() {
     // Process Serial data
     // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
-    if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == myHeader.uid && serialState == WAITING) {
+    if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == queuePDUs[0] && serialState == WAITING) {
       setSlaveStatus(serialIn[0], responding, true);  // flag slave as responding
       setSlaveStatus(serialIn[0], error, false);      // flag slave as without error
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2) };
@@ -136,12 +131,12 @@ void recvSerial() {
   // Deal with Serial timeouts (i.e. Modbus RTU timeouts)
   if (serialState == WAITING && requestTimeout.isOver()) {
     header myHeader = queueHeaders.first();
-    setSlaveStatus(myHeader.uid, responding, false);                                    // flag slave as nonresponding
-    if (myHeader.clientNum != SCAN_REQUEST) setSlaveStatus(myHeader.uid, error, true);  // flag slave as error
+    setSlaveStatus(queuePDUs[0], responding, false);                                    // flag slave as nonresponding
+    if (myHeader.clientNum != SCAN_REQUEST) setSlaveStatus(queuePDUs[0], error, true);  // flag slave as error
     if (queueRetries.first() >= localConfig.serialAttempts) {
       // send modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
-      byte PDU[] = { myHeader.uid, (byte)(queuePDUs[0] + 0x80), 0x0B };
+      byte PDU[] = { queuePDUs[0], (byte)(queuePDUs[1] + 0x80), 0x0B };
       crc = 0xFFFF;
       for (byte i = 0; i < sizeof(PDU); i++) {
         calculateCRC(PDU[i]);
@@ -151,37 +146,37 @@ void recvSerial() {
           break;
         case UDP_REQUEST:
           Udp.beginPacket(myHeader.remIP, myHeader.remPort);
-        if (!localConfig.enableRtuOverTcp) {
-          Udp.write(MBAP, 6);
-        }
-        Udp.write(PDU, 3);
-        if (localConfig.enableRtuOverTcp) {
-          Udp.write(lowByte(crc));  // send CRC, low byte first
-          Udp.write(highByte(crc));
-        }
-        Udp.endPacket();
-#ifdef ENABLE_EXTRA_DIAG
-        ethTxCount += 5;
-        if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
-#endif /* ENABLE_EXTRA_DIAG */
-          break;
-        default:  // Ethernet client
-          {
-        EthernetClient client = EthernetClient(myHeader.clientNum);
-        if (client.connected()) {
           if (!localConfig.enableRtuOverTcp) {
-            client.write(MBAP, 6);
+            Udp.write(MBAP, 6);
           }
-          client.write(PDU, 3);
+          Udp.write(PDU, 3);
           if (localConfig.enableRtuOverTcp) {
-            client.write(lowByte(crc));  // send CRC, low byte first
-            client.write(highByte(crc));
+            Udp.write(lowByte(crc));  // send CRC, low byte first
+            Udp.write(highByte(crc));
           }
+          Udp.endPacket();
 #ifdef ENABLE_EXTRA_DIAG
           ethTxCount += 5;
           if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
 #endif /* ENABLE_EXTRA_DIAG */
-        }
+          break;
+        default:  // Ethernet client
+          {
+            EthernetClient client = EthernetClient(myHeader.clientNum);
+            if (client.connected()) {
+              if (!localConfig.enableRtuOverTcp) {
+                client.write(MBAP, 6);
+              }
+              client.write(PDU, 3);
+              if (localConfig.enableRtuOverTcp) {
+                client.write(lowByte(crc));  // send CRC, low byte first
+                client.write(highByte(crc));
+              }
+#ifdef ENABLE_EXTRA_DIAG
+              ethTxCount += 5;
+              if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
+            }
             break;
           }
       }

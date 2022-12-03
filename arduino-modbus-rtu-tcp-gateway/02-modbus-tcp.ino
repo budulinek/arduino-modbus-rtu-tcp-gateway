@@ -26,6 +26,8 @@
 
    ***************************************************************** */
 
+#define ADDRESS_POS (6 * !localConfig.enableRtuOverTcp)  // position of slave address in the TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
+
 // bool arrays for storing Modbus RTU status (responging or not responding). Array index corresponds to slave address.
 uint8_t responding[(maxSlaves + 1 + 7) / 8];
 uint8_t error[(maxSlaves + 1 + 7) / 8];
@@ -44,24 +46,19 @@ typedef struct {
 CircularBuffer<header, reqQueueCount> queueHeaders;  // queue of requests' headers and metadata (MBAP transaction ID, MBAP unit ID, PDU length, remIP, remPort, TCP client)
 CircularBuffer<byte, reqQueueSize> queuePDUs;        // queue of PDU data (function code, data)
 CircularBuffer<byte, reqQueueCount> queueRetries;    // queue of retry counters
-byte pduStart;  // first byte of Protocol Data Unit (i.e. Function code)
-
 
 void recvUdp() {
-  unsigned int packetSize = Udp.parsePacket();
-  if (packetSize) {
+  unsigned int msgLength = Udp.parsePacket();
+  if (msgLength) {
 #ifdef ENABLE_EXTRA_DIAG
-    ethRxCount += packetSize;
-#endif /* ENABLE_EXTRA_DIAG */
+    ethRxCount += msgLength;
+#endif                              /* ENABLE_EXTRA_DIAG */
     byte inBuffer[modbusSize + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
     // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address)..... no CRC
     // Modbus RTU frame: [0] address.....[n-1][n] CRC
     Udp.read(inBuffer, sizeof(inBuffer));
     Udp.flush();
-    if (localConfig.enableRtuOverTcp) pduStart = 1;  // In Modbus RTU, Function code is second byte (after address)
-    else pduStart = 7;                               // In Modbus TCP/UDP, Function code is 8th byte (after address)
-
-    byte errorCode = checkRequest(inBuffer, packetSize, (IPAddress)Udp.remoteIP(), Udp.remotePort(), UDP_REQUEST);
+    byte errorCode = checkRequest(inBuffer, msgLength, (IPAddress)Udp.remoteIP(), Udp.remotePort(), UDP_REQUEST);
     if (errorCode) {
       // send back message with error code
       Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
@@ -69,13 +66,13 @@ void recvUdp() {
         Udp.write(inBuffer, 5);
         Udp.write(0x03);
       }
-      Udp.write(inBuffer[pduStart - 1]);     // address
-      Udp.write(inBuffer[pduStart] + 0x80);  // function + 0x80
+      Udp.write(inBuffer[ADDRESS_POS]);             // address
+      Udp.write(inBuffer[ADDRESS_POS + 1] + 0x80);  // function + 0x80
       Udp.write(errorCode);
       if (localConfig.enableRtuOverTcp) {
         crc = 0xFFFF;
-        calculateCRC(inBuffer[pduStart - 1]);
-        calculateCRC(inBuffer[pduStart] + 0x80);
+        calculateCRC(inBuffer[ADDRESS_POS]);
+        calculateCRC(inBuffer[ADDRESS_POS + 1] + 0x80);
         calculateCRC(errorCode);
         Udp.write(lowByte(crc));  // send CRC, low byte first
         Udp.write(highByte(crc));
@@ -92,33 +89,29 @@ void recvUdp() {
 void recvTcp() {
   EthernetClient client = modbusServer.available();
   if (client) {
-    unsigned int packetSize = client.available();
+    unsigned int msgLength = client.available();
 #ifdef ENABLE_EXTRA_DIAG
-    ethRxCount += packetSize;
-#endif /* ENABLE_EXTRA_DIAG */
+    ethRxCount += msgLength;
+#endif                              /* ENABLE_EXTRA_DIAG */
     byte inBuffer[modbusSize + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
     // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
     // Modbus RTU frame: [0] address.....
     client.read(inBuffer, sizeof(inBuffer));
     client.flush();
-
-    if (localConfig.enableRtuOverTcp) pduStart = 1;  // In Modbus RTU, Function code is second byte (after address)
-    else pduStart = 7;                               // In Modbus TCP/UDP, Function code is 8th byte (after address)
-
-    byte errorCode = checkRequest(inBuffer, packetSize, (IPAddress){}, 0, client.getSocketNumber());
+    byte errorCode = checkRequest(inBuffer, msgLength, (IPAddress){}, 0, client.getSocketNumber());
     if (errorCode) {
       // send back message with error code
       if (!localConfig.enableRtuOverTcp) {
         client.write(inBuffer, 5);
         client.write(0x03);
       }
-      client.write(inBuffer[pduStart - 1]);     // address
-      client.write(inBuffer[pduStart] + 0x80);  // function + 0x80
+      client.write(inBuffer[ADDRESS_POS]);             // address
+      client.write(inBuffer[ADDRESS_POS + 1] + 0x80);  // function + 0x80
       client.write(errorCode);
       if (localConfig.enableRtuOverTcp) {
         crc = 0xFFFF;
-        calculateCRC(inBuffer[pduStart - 1]);
-        calculateCRC(inBuffer[pduStart] + 0x80);
+        calculateCRC(inBuffer[ADDRESS_POS]);
+        calculateCRC(inBuffer[ADDRESS_POS + 1] + 0x80);
         calculateCRC(errorCode);
         client.write(lowByte(crc));  // send CRC, low byte first
         client.write(highByte(crc));
@@ -133,10 +126,11 @@ void recvTcp() {
 
 void processRequests() {
   // Insert scan request into queue
-  if (scanCounter != 0 && queueHeaders.available() > 1 && queuePDUs.available() > 1) {
+  if (scanCounter != 0 && queueHeaders.available() > 1 && queuePDUs.available() > sizeof(scanCommand) + 1) {
     // Store scan request in request queue
-    queueHeaders.push(header{ { 0x00, 0x00 }, scanCounter, sizeof(scanCommand), {}, 0, SCAN_REQUEST });
+    queueHeaders.push(header{ { 0x00, 0x00 }, scanCounter, sizeof(scanCommand) + 1, {}, 0, SCAN_REQUEST });
     queueRetries.push(localConfig.serialAttempts - 1);  // scan requests are only sent once, so set "queueRetries" to one attempt below limit
+    queuePDUs.push(scanCounter);                        // address of the scanned slave
     for (byte i = 0; i < sizeof(scanCommand); i++) {
       queuePDUs.push(scanCommand[i]);
     }
@@ -160,29 +154,30 @@ void processRequests() {
   }
 }
 
-byte checkRequest(byte inBuffer[], unsigned int packetSize, IPAddress remoteIP, unsigned int remotePort, byte clientNum) {
+byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress remoteIP, const unsigned int remotePort, const byte clientNum) {
   byte address;
   if (localConfig.enableRtuOverTcp) address = inBuffer[0];
   else address = inBuffer[6];
   if (localConfig.enableRtuOverTcp) {  // check CRC for Modbus RTU over TCP/UDP
-    if (checkCRC(inBuffer, packetSize) == false) {
+    if (checkCRC(inBuffer, msgLength) == false) {
       return 0;  // reject: do nothing and return no error code
     }
   } else {  // check MBAP header structure for Modbus TCP/UDP
-    if (inBuffer[2] != 0x00 || inBuffer[3] != 0x00 || inBuffer[4] != 0x00 || inBuffer[5] != packetSize - 6) {
+    if (inBuffer[2] != 0x00 || inBuffer[3] != 0x00 || inBuffer[4] != 0x00 || inBuffer[5] != msgLength - 6) {
       return 0;  // reject: do nothing and return no error code
     }
   }
+  msgLength = msgLength - ADDRESS_POS - (2 * localConfig.enableRtuOverTcp);   // in Modbus RTU over TCP/UDP do not store CRC
   // check if we have space in request queue
-  if (queueHeaders.available() < 1 || (localConfig.enableRtuOverTcp && queuePDUs.available() < packetSize - 1) || (!localConfig.enableRtuOverTcp && queuePDUs.available() < packetSize - 7)) {
+  if (queueHeaders.available() < 1 || queuePDUs.available() < msgLength) {
     return 0x06;  // return modbus error 6 (Slave Device Busy) - try again later
   }
-  // al checkes passed OK, we can store the incoming data in request queue
-  // Store in request queue: 2 bytes MBAP Transaction ID (ignored in Modbus RTU over TCP); MBAP Unit ID (address); PDUlen (func + data);remote IP; remote port; TCP client Number (socket) - 0xFF for UDP
-  queueHeaders.push(header{ { inBuffer[0], inBuffer[1] }, inBuffer[pduStart - 1], (byte)(packetSize - pduStart), (IPAddress)remoteIP, (unsigned int)remotePort, (byte)clientNum });
+  // all checkes passed OK, we can store the incoming data in request queue
+  // Store in request queue: 2 bytes MBAP Transaction ID (ignored in Modbus RTU over TCP); MBAP Unit ID (address); message length; remote IP; remote port; TCP client Number (socket) - 0xFF for UDP
+  queueHeaders.push(header{ { inBuffer[0], inBuffer[1] }, inBuffer[ADDRESS_POS], (byte)msgLength, (IPAddress)remoteIP, (unsigned int)remotePort, (byte)clientNum });
   queueRetries.push(0);
-  for (byte i = 0; i < packetSize - pduStart; i++) {
-    queuePDUs.push(inBuffer[i + pduStart]);
+  for (byte i = 0; i < msgLength; i++) {  
+    queuePDUs.push(inBuffer[i + ADDRESS_POS]);
   }
   return 0;
 }
