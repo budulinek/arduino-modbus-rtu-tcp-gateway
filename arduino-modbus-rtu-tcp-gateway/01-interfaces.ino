@@ -92,6 +92,7 @@ void startEthernet() {
 
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
+#ifdef ENABLE_DHCP
 void maintainDhcp() {
   if (localConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
     uint8_t maintainResult = Ethernet.maintain();
@@ -101,7 +102,9 @@ void maintainDhcp() {
     }
   }
 }
+#endif /* ENABLE_DHCP */
 
+#ifdef ENABLE_EXTRA_DIAG
 void maintainUptime() {
   unsigned long milliseconds = millis();
   if (last_milliseconds > milliseconds) {
@@ -115,6 +118,7 @@ void maintainUptime() {
   //We add the "remaining_seconds", so that we can continue measuring the time passed from the last boot of the device.
   seconds = (milliseconds / 1000) + remaining_seconds;
 }
+#endif /* ENABLE_EXTRA_DIAG */
 
 void maintainCounters() {
   // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively

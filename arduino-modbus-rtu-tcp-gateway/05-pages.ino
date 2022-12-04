@@ -352,20 +352,36 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F(">Scan</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
-    if (getSlaveStatus(k, responding) == true || getSlaveStatus(k, error) == true || k == scanCounter) {
-      chunked.print(F("<tr><td><td>0x"));
-      if (k < 16) chunked.print(F("0"));
-      chunked.print(k, HEX);
-      if (getSlaveStatus(k, responding) == true) {
-        chunked.print(F(" OK"));
+    for (int s = 0; s < STAT_NUM; s++) {
+      if (getSlaveStatus(k, s) == true || k == scanCounter) {
         countSlaves++;
-      } else if (getSlaveStatus(k, error) == true) {
-        chunked.print(F(" Failed to respond"));
-        countSlaves++;
-      } else chunked.print(F(" scanning..."));
+        chunked.print(F("<tr><td><td>0x"));
+        if (k < 16) chunked.print(F("0"));
+        chunked.print(k, HEX);
+        if (k == scanCounter) {
+          chunked.print(F(" Scanning..."));
+          break;
+        }
+        switch (s) {
+          case STAT_OK:
+            chunked.print(F(" OK"));
+            break;
+          case STAT_ERROR_0X:
+            chunked.print(F(" Responded with Error (0x01~0x08)"));
+            break;
+          case STAT_ERROR_0A:
+            chunked.print(F(" Gateway Overloaded (0x0A)"));
+            break;
+          case STAT_ERROR_0B:
+            chunked.print(F(" Failed to Respond (0x0B)"));
+            break;
+          default:
+            break;
+        }
+      }
     }
   }
-  if (countSlaves == 0 && scanCounter == 0) chunked.print(F("<tr><td><td>none"));
+  if (countSlaves == 0 && scanCounter == 0) chunked.print(F("<tr><td><td>None"));
 }
 
 

@@ -26,26 +26,37 @@
 
    ***************************************************************** */
 
-#define ADDRESS_POS (6 * !localConfig.enableRtuOverTcp)  // position of slave address in the TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
+#define ADDRESS_POS (6 * !localConfig.enableRtuOverTcp)  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
+
+enum status : byte {
+  STAT_OK,
+  STAT_ERROR_0X,
+  STAT_ERROR_0A,
+  STAT_ERROR_0B,
+  STAT_NUM  // Number of status flags in this enum. Must be the last element within this enum!!
+};
+
+// bool arrays for storing Modbus RTU status of individual slaves
+uint8_t stat[STAT_NUM][(maxSlaves + 1 + 7) / 8];
 
 // bool arrays for storing Modbus RTU status (responging or not responding). Array index corresponds to slave address.
-uint8_t responding[(maxSlaves + 1 + 7) / 8];
-uint8_t error[(maxSlaves + 1 + 7) / 8];
+// uint8_t statOk[(maxSlaves + 1 + 7) / 8];
+// uint8_t statError0B[(maxSlaves + 1 + 7) / 8];
+
 uint8_t masks[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 typedef struct {
   byte tid[2];           // MBAP Transaction ID
-  byte uid;              // MBAP Unit ID (address)
-  byte PDUlen;           // lenght of PDU (func + data) stored in queuePDUs
+  byte msgLen;           // lenght of Modbus message stored in queuePDUs
   IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
   unsigned int remPort;  // remote port for UDP client (UDP response is sent back to remote port)
   byte clientNum;        // TCP client who sent the request, UDP_REQUEST (0xFF) designates UDP client
+  byte atts;             // attempts counter
 } header;
 
 // each request is stored in 3 queues (all queues are written to, read and deleted in sync)
 CircularBuffer<header, reqQueueCount> queueHeaders;  // queue of requests' headers and metadata (MBAP transaction ID, MBAP unit ID, PDU length, remIP, remPort, TCP client)
 CircularBuffer<byte, reqQueueSize> queuePDUs;        // queue of PDU data (function code, data)
-CircularBuffer<byte, reqQueueCount> queueRetries;    // queue of retry counters
 
 void recvUdp() {
   unsigned int msgLength = Udp.parsePacket();
@@ -128,9 +139,15 @@ void processRequests() {
   // Insert scan request into queue
   if (scanCounter != 0 && queueHeaders.available() > 1 && queuePDUs.available() > sizeof(scanCommand) + 1) {
     // Store scan request in request queue
-    queueHeaders.push(header{ { 0x00, 0x00 }, scanCounter, sizeof(scanCommand) + 1, {}, 0, SCAN_REQUEST });
-    queueRetries.push(localConfig.serialAttempts - 1);  // scan requests are only sent once, so set "queueRetries" to one attempt below limit
-    queuePDUs.push(scanCounter);                        // address of the scanned slave
+    queueHeaders.push(header{
+      { 0x00, 0x00 },                  // tid[2]
+      sizeof(scanCommand) + 1,         // msgLen
+      {},                              // remIP
+      0,                               // remPort
+      SCAN_REQUEST,                    // clientNum
+      localConfig.serialAttempts - 1,  // atts
+    });
+    queuePDUs.push(scanCounter);  // address of the scanned slave
     for (byte i = 0; i < sizeof(scanCommand); i++) {
       queuePDUs.push(scanCommand[i]);
     }
@@ -140,24 +157,21 @@ void processRequests() {
   // Optimize queue (prioritize requests from responding slaves) and trigger sending via serial
   if (serialState == IDLE) {  // send new data over serial only if we are not waiting for response
     if (!queueHeaders.isEmpty()) {
-      boolean queueHasRespondingSlaves;  // true if  queue holds at least one request to responding slaves
-      for (byte i = 0; i < queueHeaders.size(); i++) {
-        if (getSlaveStatus(queueHeaders[i].uid, responding) == true) {
-          queueHasRespondingSlaves = true;
-          break;
-        } else {
-          queueHasRespondingSlaves = false;
-        }
-      }
+      // boolean queueHasRespondingSlaves;  // true if  queue holds at least one request to responding slaves
+      // for (byte i = 0; i < queueHeaders.size(); i++) {
+      //   if (getSlaveStatus(queueHeaders[i].uid, statOk) == true) {
+      //     queueHasRespondingSlaves = true;
+      //     break;
+      //   } else {
+      //     queueHasRespondingSlaves = false;
+      //   }
+      // }
       serialState = SENDING;  // trigger sendSerial()
     }
   }
 }
 
 byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress remoteIP, const unsigned int remotePort, const byte clientNum) {
-  byte address;
-  if (localConfig.enableRtuOverTcp) address = inBuffer[0];
-  else address = inBuffer[6];
   if (localConfig.enableRtuOverTcp) {  // check CRC for Modbus RTU over TCP/UDP
     if (checkCRC(inBuffer, msgLength) == false) {
       return 0;  // reject: do nothing and return no error code
@@ -167,16 +181,23 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
       return 0;  // reject: do nothing and return no error code
     }
   }
-  msgLength = msgLength - ADDRESS_POS - (2 * localConfig.enableRtuOverTcp);   // in Modbus RTU over TCP/UDP do not store CRC
+  msgLength = msgLength - ADDRESS_POS - (2 * localConfig.enableRtuOverTcp);  // in Modbus RTU over TCP/UDP do not store CRC
   // check if we have space in request queue
   if (queueHeaders.available() < 1 || queuePDUs.available() < msgLength) {
-    return 0x06;  // return modbus error 6 (Slave Device Busy) - try again later
+    setSlaveStatus(inBuffer[ADDRESS_POS], STAT_ERROR_0A, true);
+    return 0x0A;  // return modbus error 0x0A (Gateway Overloaded)
   }
   // all checkes passed OK, we can store the incoming data in request queue
-  // Store in request queue: 2 bytes MBAP Transaction ID (ignored in Modbus RTU over TCP); MBAP Unit ID (address); message length; remote IP; remote port; TCP client Number (socket) - 0xFF for UDP
-  queueHeaders.push(header{ { inBuffer[0], inBuffer[1] }, inBuffer[ADDRESS_POS], (byte)msgLength, (IPAddress)remoteIP, (unsigned int)remotePort, (byte)clientNum });
-  queueRetries.push(0);
-  for (byte i = 0; i < msgLength; i++) {  
+  // Store in request queue
+  queueHeaders.push(header{
+    { inBuffer[0], inBuffer[1] },  // tid[2] (ignored in Modbus RTU over TCP/UDP)
+    (byte)msgLength,               // msgLen
+    (IPAddress)remoteIP,           // remIP
+    (unsigned int)remotePort,      // remPort
+    (byte)clientNum,               // clientNum
+    0,                             // atts
+  });
+  for (byte i = 0; i < msgLength; i++) {
     queuePDUs.push(inBuffer[i + ADDRESS_POS]);
   }
   return 0;
@@ -184,20 +205,25 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
 
 void deleteRequest()  // delete request from queue
 {
-  for (byte i = 0; i < queueHeaders.first().PDUlen; i++) {
+  for (byte i = 0; i < queueHeaders.first().msgLen; i++) {
     queuePDUs.shift();
   }
   queueHeaders.shift();
-  queueRetries.shift();
 }
 
-bool getSlaveStatus(const uint8_t index, const uint8_t status[]) {
-  if (index >= maxSlaves) return false;  // error
-  return (status[index / 8] & masks[index & 7]) > 0;
+bool getSlaveStatus(const uint8_t slave, const byte status) {
+  if (slave >= maxSlaves) return false;  // error
+  return (stat[status][slave / 8] & masks[slave & 7]) > 0;
 }
 
-void setSlaveStatus(const uint8_t index, uint8_t status[], const bool value) {
-  if (index >= maxSlaves) return;  // error
-  if (value == 0) status[index / 8] &= ~masks[index & 7];
-  else status[index / 8] |= masks[index & 7];
+void setSlaveStatus(const uint8_t slave, byte status, const bool value) {
+  if (slave >= maxSlaves) return;  // error
+  if (value == 0) {
+    stat[status][slave / 8] &= ~masks[slave & 7];
+  } else {
+    for (byte i = 0; i < STAT_NUM; i++) {
+      stat[i][slave / 8] &= ~masks[slave & 7];  // set all other flags to false
+    }
+    stat[status][slave / 8] |= masks[slave & 7];
+  }
 }
