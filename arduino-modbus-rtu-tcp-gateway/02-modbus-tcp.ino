@@ -39,6 +39,10 @@ enum status : byte {
 // bool arrays for storing Modbus RTU status of individual slaves
 uint8_t stat[STAT_NUM][(maxSlaves + 1 + 7) / 8];
 
+// array for storing error counts
+uint16_t errorCount[STAT_NUM];
+uint16_t errorInvalid;
+
 // bool arrays for storing Modbus RTU status (responging or not responding). Array index corresponds to slave address.
 // uint8_t statOk[(maxSlaves + 1 + 7) / 8];
 // uint8_t statError0B[(maxSlaves + 1 + 7) / 8];
@@ -174,10 +178,12 @@ void processRequests() {
 byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress remoteIP, const unsigned int remotePort, const byte clientNum) {
   if (localConfig.enableRtuOverTcp) {  // check CRC for Modbus RTU over TCP/UDP
     if (checkCRC(inBuffer, msgLength) == false) {
+      errorInvalid++;
       return 0;  // reject: do nothing and return no error code
     }
   } else {  // check MBAP header structure for Modbus TCP/UDP
     if (inBuffer[2] != 0x00 || inBuffer[3] != 0x00 || inBuffer[4] != 0x00 || inBuffer[5] != msgLength - 6) {
+      errorInvalid++;
       return 0;  // reject: do nothing and return no error code
     }
   }
@@ -225,5 +231,6 @@ void setSlaveStatus(const uint8_t slave, byte status, const bool value) {
       stat[i][slave / 8] &= ~masks[slave & 7];  // set all other flags to false
     }
     stat[status][slave / 8] |= masks[slave & 7];
+    errorCount[status]++;
   }
 }

@@ -215,15 +215,11 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F(" mins, "));
   chunked.print(mod_seconds);
   chunked.print(F(" secs"));
-#endif /* ENABLE_EXTRA_DIAG */
-
   chunked.print(F("<tr><td>RS485 Data:<td>"));
   chunked.print(serialTxCount);
   chunked.print(F(" Tx bytes / "));
   chunked.print(serialRxCount);
   chunked.print(F(" Rx bytes"));
-
-#ifdef ENABLE_EXTRA_DIAG
   chunked.print(F("<tr><td>Ethernet Data:<td>"));
   chunked.print(ethTxCount);
   chunked.print(F(" Tx bytes / "));
@@ -326,6 +322,22 @@ void contentStatus(ChunkedPrint &chunked) {
 #endif /* ENABLE_EXTRA_DIAG */
 
   chunked.print(F("<tr><td><br>"
+                  "<tr><td>Modbus Stats:<td>"));
+  chunked.print(errorCount[STAT_OK]);
+  chunked.print(F(" Slave Responded"
+                  "<tr><td><td>"));
+  chunked.print(errorCount[STAT_ERROR_0X]);
+  chunked.print(F(" Slave Responded with Error (Codes 1~8)"
+                  "<tr><td><td>"));
+  chunked.print(errorCount[STAT_ERROR_0A]);
+  chunked.print(F(" Gateway Overloaded (Code 10)"
+                  "<tr><td><td>"));
+  chunked.print(errorCount[STAT_ERROR_0B]);
+  chunked.print(F(" Slave Failed to Respond (Code 11)"
+                  "<tr><td><td>"));
+  chunked.print(errorInvalid);
+  chunked.print(F(" Invalid Request (Dropped by Gateway)"));
+  chunked.print(F("<tr><td><br>"
                   "<tr><td>Modbus TCP/UDP Masters:"));
   byte countMasters = 0;
   for (byte i = 0; i < maxSockNum; i++) {
@@ -343,13 +355,13 @@ void contentStatus(ChunkedPrint &chunked) {
       }
     }
   }
-  if (countMasters == 0) chunked.print(F("<td>none"));
+  if (countMasters == 0) chunked.print(F("<td>None"));
   chunked.print(F("<tr><td><br>"
                   "<tr><td>Modbus RTU Slaves:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(SCAN);
-  chunked.print(F(">Scan</button>"));
+  chunked.print(F(">Scan & Reset Stats</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < maxSlaves; k++) {
     for (int s = 0; s < STAT_NUM; s++) {
@@ -364,16 +376,16 @@ void contentStatus(ChunkedPrint &chunked) {
         }
         switch (s) {
           case STAT_OK:
-            chunked.print(F(" OK"));
+            chunked.print(F(" Slave Responded"));
             break;
           case STAT_ERROR_0X:
-            chunked.print(F(" Responded with Error (0x01~0x08)"));
+            chunked.print(F(" Slave Responded with Error (Codes 1~8)"));
             break;
           case STAT_ERROR_0A:
-            chunked.print(F(" Gateway Overloaded (0x0A)"));
+            chunked.print(F(" Gateway Overloaded (Code 10)"));
             break;
           case STAT_ERROR_0B:
-            chunked.print(F(" Failed to Respond (0x0B)"));
+            chunked.print(F(" Slave Failed to Respond (Code 11)"));
             break;
           default:
             break;

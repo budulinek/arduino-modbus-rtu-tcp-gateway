@@ -161,6 +161,8 @@ void recvWeb() {
     // Actions that require "please wait" page
     if (action == WEB || action == REBOOT || action == ETH_SOFT || action == FACTORY || action == MAC) {
       reqPage = PAGE_WAIT;
+      // } else if (action == RESET_COUNTERS) {
+      //   reqPage = PAGE_STATUS;
     }
 
     // Send page
@@ -332,7 +334,15 @@ void processPost(char postParameter[]) {
       break;
     case SCAN:
       scanCounter = 1;
-      memset(&stat, 0, sizeof(stat));       // clear all status flags
+      memset(&stat, 0, sizeof(stat));  // clear all status flags
+      memset(errorCount, 0, sizeof(errorCount));
+      errorInvalid = 0;
+#ifdef ENABLE_EXTRA_DIAG
+      ethRxCount = 0;
+      ethTxCount = 0;
+      serialRxCount = 0;
+      serialTxCount = 0;
+#endif /* ENABLE_EXTRA_DIAG */
       break;
     default:
       break;

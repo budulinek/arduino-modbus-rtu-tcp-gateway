@@ -53,8 +53,10 @@ void sendSerial() {
     }
   } else if (serialState == DELAY && txDelay.isOver()) {
     header myHeader = queueHeaders.first();
+#ifdef ENABLE_EXTRA_DIAG
     serialTxCount += myHeader.msgLen;
     serialTxCount += 2;
+#endif
 #ifdef RS485_CONTROL_PIN
     digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Disable RS485 Transmit
 #endif                                               /* RS485_CONTROL_PIN */
@@ -127,7 +129,9 @@ void recvSerial() {
       deleteRequest();
       serialState = IDLE;
     }
+#ifdef ENABLE_EXTRA_DIAG
     serialRxCount += rxNdx;
+#endif /* ENABLE_EXTRA_DIAG */
     rxNdx = 0;
     rxErr = false;
   }

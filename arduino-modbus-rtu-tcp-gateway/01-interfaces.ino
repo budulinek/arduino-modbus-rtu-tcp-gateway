@@ -120,21 +120,19 @@ void maintainUptime() {
 }
 #endif /* ENABLE_EXTRA_DIAG */
 
+#ifdef ENABLE_EXTRA_DIAG
 void maintainCounters() {
   // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively
-#ifdef ENABLE_EXTRA_DIAG
   const unsigned long rollover = 0xFFFFFF00;
+  const unsigned int rollover = 0xFF00;
   if (serialTxCount > rollover || serialRxCount > rollover || ethTxCount > rollover || ethRxCount > rollover) {
     ethRxCount = 0;
     ethTxCount = 0;
-#else
-  const unsigned int rollover = 0xFF00;
-  if (serialTxCount > rollover || serialRxCount > rollover) {
-#endif /* ENABLE_EXTRA_DIAG */
     serialRxCount = 0;
     serialTxCount = 0;
   }
 }
+#endif /* ENABLE_EXTRA_DIAG */
 
 
 void generateMac() {

@@ -37,19 +37,19 @@
   v3.0 2021-11-07 Improve POST parameters processing, bugfix 404 and 204 error headers. 
   v3.1 2022-01-28 Code optimization, bugfix DHCP settings.
   v3.2 2022-06-04 Reduce program size (so that it fits on Nano), ethernet data counter only available when ENABLE_EXTRA_DIAG.
-  v4.0 2022-11-26 Only store last 3 bytes of MAC in EEPROM,
+  v4.0 2022-11-26 Optimize Modbus timeout and attempts counter, Modbus stats and error reporting on "Current Status" page
 
 */
 
-const byte version[] = {4, 0};
+const byte version[] = { 4, 0 };
 
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <utility/w5100.h>
-#include <CircularBuffer.h>     // CircularBuffer https://github.com/rlogiacco/CircularBuffer
+#include <CircularBuffer.h>  // CircularBuffer https://github.com/rlogiacco/CircularBuffer
 #include <EEPROM.h>
-#include <StreamLib.h>          // StreamLib https://github.com/jandrassy/StreamLib
+#include <StreamLib.h>  // StreamLib https://github.com/jandrassy/StreamLib
 
 // these are used by CreateTrulyRandomSeed() function
 #include <avr/interrupt.h>
@@ -58,13 +58,13 @@ const byte version[] = {4, 0};
 
 /****** ADVANCED SETTINGS ******/
 
-const byte reqQueueCount = 15;       // max number of TCP or UDP requests stored in queue
-const int reqQueueSize = 256;        // total length of TCP or UDP requests stored in queue (in bytes)
-const byte maxSlaves = 247;          // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
-const int modbusSize = 256;          // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
-#define mySerial Serial              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3         
-#define RS485_CONTROL_PIN 6          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
-const byte ethResetPin = 7;          // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
+const byte reqQueueCount = 10;                                // max number of TCP or UDP requests stored in a queue
+const int reqQueueSize = 256;                                 // total length of TCP or UDP requests stored in a queue (in bytes)
+const byte maxSlaves = 247;                                   // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
+const int modbusSize = 256;                                   // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
+#define mySerial Serial                                       // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
+#define RS485_CONTROL_PIN 6                                   // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
+const byte ethResetPin = 7;                                   // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
 const byte scanCommand[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
 
 // #define DEBUG            // Main Serial (USB) is used for printing some debug info, not for Modbus RTU. At the moment, only web server related debug messages are printed.
@@ -107,10 +107,10 @@ typedef struct
 const config_type defaultConfig = {
   {},                    // macEnd (last 3 bytes)
   false,                 // enableDhcp
-  {192, 168, 1, 254},    // ip
-  {255, 255, 255, 0},    // subnet
-  {192, 168, 1, 1},      // gateway
-  {192, 168, 1, 1},      // dns
+  { 192, 168, 1, 254 },  // ip
+  { 255, 255, 255, 0 },  // subnet
+  { 192, 168, 1, 1 },    // gateway
+  { 192, 168, 1, 1 },    // dns
   502,                   // tcpPort
   502,                   // udpPort
   80,                    // webPort
@@ -130,7 +130,7 @@ const byte configStart = 128;
 #ifdef UDP_TX_PACKET_MAX_SIZE
 #undef UDP_TX_PACKET_MAX_SIZE
 #define UDP_TX_PACKET_MAX_SIZE modbusSize
-#endif 
+#endif
 
 #ifdef MAX_SOCK_NUM     // Ethernet.h library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).
 #undef MAX_SOCK_NUM     // Ignore the RAM-based limitation on the number of sockets.
@@ -139,7 +139,9 @@ const byte configStart = 128;
 
 byte maxSockNum = MAX_SOCK_NUM;
 
+#ifdef ENABLE_DHCP
 bool dhcpSuccess = false;
+#endif /* ENABLE_DHCP */
 
 const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };
 
@@ -152,19 +154,19 @@ EthernetServer webServer(80);
 #else /* DEBUG */
 #define dbg(x...) ;
 #define dbgln(x...) ;
-#endif /* DEBUG */
-#define UDP_REQUEST 0xFF      // We store these codes in "header.clientNum" in order to differentiate 
-#define SCAN_REQUEST 0xFE      // between TCP requests (their clientNum is nevew higher than 0x07), UDP requests and scan requests (triggered by scan button)
+#endif                     /* DEBUG */
+#define UDP_REQUEST 0xFF   // We store these codes in "header.clientNum" in order to differentiate
+#define SCAN_REQUEST 0xFE  // between TCP requests (their clientNum is nevew higher than 0x07), UDP requests and scan requests (triggered by scan button)
 
 /****** TIMERS AND STATE MACHINE ******/
 
 class MicroTimer {
-  private:
-    unsigned long timestampLastHitMs;
-    unsigned long sleepTimeMs;
-  public:
-    boolean isOver();
-    void sleep(unsigned long sleepTimeMs);
+private:
+  unsigned long timestampLastHitMs;
+  unsigned long sleepTimeMs;
+public:
+  boolean isOver();
+  void sleep(unsigned long sleepTimeMs);
 };
 boolean MicroTimer::isOver() {
   if ((unsigned long)(micros() - timestampLastHitMs) > sleepTimeMs) {
@@ -177,12 +179,12 @@ void MicroTimer::sleep(unsigned long sleepTimeMs) {
   timestampLastHitMs = micros();
 }
 class Timer {
-  private:
-    unsigned long timestampLastHitMs;
-    unsigned long sleepTimeMs;
-  public:
-    boolean isOver();
-    void sleep(unsigned long sleepTimeMs);
+private:
+  unsigned long timestampLastHitMs;
+  unsigned long sleepTimeMs;
+public:
+  boolean isOver();
+  void sleep(unsigned long sleepTimeMs);
 };
 boolean Timer::isOver() {
   if ((unsigned long)(millis() - timestampLastHitMs) > sleepTimeMs) {
@@ -196,8 +198,8 @@ void Timer::sleep(unsigned long sleepTimeMs) {
 }
 Timer requestTimeout;
 uint16_t crc;
-#define RS485_TRANSMIT    HIGH
-#define RS485_RECEIVE     LOW
+#define RS485_TRANSMIT HIGH
+#define RS485_RECEIVE LOW
 byte scanCounter = 0;
 enum state : byte {
   IDLE,
@@ -213,8 +215,9 @@ unsigned int frameDelay;
 
 volatile uint32_t seed1;  // seed1 is generated by CreateTrulyRandomSeed()
 volatile int8_t nrot;
-uint32_t seed2 = 17111989;   // seed2 is static
+uint32_t seed2 = 17111989;  // seed2 is static
 
+#ifdef ENABLE_EXTRA_DIAG
 // store uptime seconds (includes seconds counted before millis() overflow)
 unsigned long seconds;
 // store last millis() so that we can detect millis() overflow
@@ -222,16 +225,13 @@ unsigned long last_milliseconds = 0;
 // store seconds passed until the moment of the overflow so that we can add them to "seconds" on the next call
 unsigned long remaining_seconds = 0;
 // Data counters (we only use unsigned long in ENABLE_EXTRA_DIAG, to save flash memory)
-#ifdef ENABLE_EXTRA_DIAG
 unsigned long serialTxCount = 0;
 unsigned long serialRxCount = 0;
 unsigned long ethTxCount = 0;
 unsigned long ethRxCount = 0;
 #else
-unsigned int serialTxCount = 0;
-unsigned int serialRxCount = 0;
-// unsigned int ethTxCount = 0;
-// unsigned int ethRxCount = 0;
+// unsigned int serialTxCount = 0;
+// unsigned int serialRxCount = 0;
 #endif /* ENABLE_EXTRA_DIAG */
 
 /****** SETUP: RUNS ONCE ******/
@@ -253,8 +253,8 @@ void setup() {
   }
 
 #ifdef DEBUG
-  debugSerial.begin(localConfig.baud);    // same baud as RS485
-#endif /* DEBUG */
+  debugSerial.begin(localConfig.baud);  // same baud as RS485
+#endif                                  /* DEBUG */
 
   startSerial();
   startEthernet();
@@ -274,13 +274,13 @@ void loop() {
 #endif /* DEBUG */
 
   recvWeb();
-  maintainCounters();   // maintain counters and synchronize their reset to zero when they overflow
 
 #ifdef ENABLE_DHCP
   maintainDhcp();
 #endif /* ENABLE_DHCP */
 
 #ifdef ENABLE_EXTRA_DIAG
+  maintainCounters();  // maintain counters and synchronize their reset to zero when they overflow
   maintainUptime();    // maintain uptime in case of millis() overflow
-#endif /* ENABLE_EXTRA_DIAG */
+#endif                 /* ENABLE_EXTRA_DIAG */
 }
