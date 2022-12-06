@@ -86,8 +86,6 @@ void startEthernet() {
   if (Ethernet.hardwareStatus() == EthernetW5100) {
     maxSockNum = 4;  // W5100 chip never supports more than 4 sockets
   }
-  dbg(F("[arduino] Server available at http://"));
-  dbgln(Ethernet.localIP());
 }
 
 void (*resetFunc)(void) = 0;  //declare reset function at address 0

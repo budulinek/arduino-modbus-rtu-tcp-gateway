@@ -84,8 +84,6 @@ enum post_key : byte {
 void recvWeb() {
   EthernetClient client = webServer.available();
   if (client) {
-    dbg(F("[web in] Data from client "));
-
     char uri[smallbuffersize];  // the requested page
     // char requestParameter[smallbuffersize];      // parameter appended to the URI after a ?
     // char postParameter[smallbuffersize] {'\0'};         // parameter transmitted in the body / by POST
@@ -102,34 +100,19 @@ void recvWeb() {
       status = REQUEST;
       while (client.available()) {
         char c = client.read();
-        // dbg(c);     // Debug print received characters to Serial monitor
         if (c == '\n') {
           if (status == REQUEST)  // read the first line
           {
-            dbg(F("[web in] webInBuffer="));
-            dbgln(webInBuffer);
             // now split the input
             char *ptr;
             ptr = strtok(webInBuffer, " ");  // strtok willdestroy the newRequest
             ptr = strtok(NULL, " ");
             strlcpy(uri, ptr, sizeof(uri));  // enthält noch evtl. parameter
-            dbg(F("[web in] uri="));
-            dbgln(uri);
             status = EMPTY_LINE;                 // jump to next status
           } else if (status > REQUEST && i < 2)  // check if we have an empty line
           {
             status = BODY;
           }
-          //            else if (status == BODY)
-          //            {
-          //              dbg(F("[web] postParameter=")); dbgln(webInBuffer);
-          //              if (webInBuffer[0] != '\0') {
-          //                dbg(F("[web] Processing POST"));
-          //                processPost(webInBuffer);
-          //              }
-          //              // strlcpy(postParameter, webInBuffer, sizeof(postParameter));
-          //              break; // we have received one line payload and break out
-          //            }
           i = 0;
           memset(webInBuffer, 0, sizeof(webInBuffer));
         } else {
@@ -143,8 +126,6 @@ void recvWeb() {
       }
       if (status == BODY)  // status 3 could end without linefeed, therefore we takeover here also
       {
-        dbg(F("[web in] POST data="));
-        dbgln(webInBuffer);
         if (webInBuffer[0] != '\0') {
           processPost(webInBuffer);
         }
@@ -350,7 +331,6 @@ void processPost(char postParameter[]) {
   // new parameter values received, save them to EEPROM
   EEPROM.put(configStart + 1, localConfig);  // it is safe to call, only changed values are updated
   if (action == SERIAL_SOFT) {               // can do it without "please wait" page
-    dbgln(F("[serial] reload Serial"));
     Serial.flush();
     Serial.end();
     startSerial();

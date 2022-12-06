@@ -29,7 +29,6 @@ const byte webOutBufferSize = 128;  // size of web server write buffer (used by 
 void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[webOutBufferSize];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
-  dbgln(F("[web out] 200 response send"));
   chunked.print(F("HTTP/1.1 200 OK\r\n"
                   "Connection: close\r\n"
                   "Content-Type: text/html\r\n"
@@ -629,15 +628,12 @@ void helperStats(ChunkedPrint &chunked, const byte stat) {
 }
 
 void send404(EthernetClient &client) {
-  dbgln(F("[web out] response 404 file not found"));
   client.println(F("HTTP/1.1 404 Not Found\r\n"
                    "Content-Length: 0"));
   client.stop();
 }
 
-
 void send204(EthernetClient &client) {
-  dbgln(F("[web out] response 204 no content"));
   client.println(F("HTTP/1.1 204 No content"));
   client.stop();
 }

@@ -58,7 +58,7 @@ const byte version[] = { 4, 0 };
 
 /****** ADVANCED SETTINGS ******/
 
-const byte maxQueueRequests = 10;                                // max number of TCP or UDP requests stored in a queue
+const byte maxQueueRequests = 10;                             // max number of TCP or UDP requests stored in a queue
 const int maxQueueData = 256;                                 // total length of TCP or UDP requests stored in a queue (in bytes)
 const byte maxSlaves = 247;                                   // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
 const int modbusSize = 256;                                   // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
@@ -148,13 +148,7 @@ const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };
 EthernetUDP Udp;
 EthernetServer modbusServer(502);
 EthernetServer webServer(80);
-#ifdef DEBUG
-#define dbg(x...) debugSerial.print(x);
-#define dbgln(x...) debugSerial.println(x);
-#else /* DEBUG */
-#define dbg(x...) ;
-#define dbgln(x...) ;
-#endif                     /* DEBUG */
+
 #define UDP_REQUEST 0xFF   // We store these codes in "header.clientNum" in order to differentiate
 #define SCAN_REQUEST 0xFE  // between TCP requests (their clientNum is nevew higher than 0x07), UDP requests and scan requests (triggered by scan button)
 
@@ -251,14 +245,8 @@ void setup() {
     EEPROM.write(configStart, version[0]);
     EEPROM.put(configStart + 1, localConfig);
   }
-
-#ifdef DEBUG
-  debugSerial.begin(localConfig.baud);  // same baud as RS485
-#endif                                  /* DEBUG */
-
   startSerial();
   startEthernet();
-  dbgln(F("\n[arduino] Starting..."));
 }
 
 /****** LOOP ******/
@@ -267,12 +255,8 @@ void loop() {
   recvUdp();
   recvTcp();
   processRequests();
-
-#ifndef DEBUG
   sendSerial();
   recvSerial();
-#endif /* DEBUG */
-
   recvWeb();
 
 #ifdef ENABLE_DHCP
