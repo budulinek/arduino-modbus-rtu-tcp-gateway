@@ -34,8 +34,8 @@ void sendSerial() {
       crc = 0xFFFF;
     }
     while (mySerial.availableForWrite() > 0 && txNdx < myHeader.msgLen) {
-      mySerial.write(queuePDUs[txNdx]);
-      calculateCRC(queuePDUs[txNdx]);
+      mySerial.write(queueData[txNdx]);
+      calculateCRC(queueData[txNdx]);
       txNdx++;
     }
     if (mySerial.availableForWrite() > 1 && txNdx == myHeader.msgLen) {
@@ -60,7 +60,7 @@ void sendSerial() {
 #ifdef RS485_CONTROL_PIN
     digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Disable RS485 Transmit
 #endif                                               /* RS485_CONTROL_PIN */
-    if (queuePDUs[0] == 0x00) {                      // Modbus broadcast - we do not count attempts and delete immediatelly
+    if (queueData[0] == 0x00) {                      // Modbus broadcast - we do not count attempts and delete immediatelly
       serialState = IDLE;
       deleteRequest();
     } else {
@@ -93,7 +93,7 @@ void recvSerial() {
     // Process Serial data
     // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
-    if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == queuePDUs[0] && serialState == WAITING) {
+    if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
       if (serialIn[1] > 0x80 && myHeader.clientNum != SCAN_REQUEST) {
         setSlaveStatus(serialIn[0], STAT_ERROR_0X, true);
       } else {
@@ -139,19 +139,18 @@ void recvSerial() {
   // Deal with Serial timeouts (i.e. Modbus RTU timeouts)
   if (serialState == WAITING && requestTimeout.isOver()) {
     header myHeader = queueHeaders.first();
+    if (myHeader.clientNum != SCAN_REQUEST) setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true);
     if (myHeader.atts >= localConfig.serialAttempts) {
       if (myHeader.clientNum != SCAN_REQUEST) {
         // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
-        setSlaveStatus(queuePDUs[0], STAT_ERROR_0B, true);
+        setSlaveStatus(queueData[0], STAT_ERROR_0B, true);
         byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
-        byte PDU[] = { queuePDUs[0], (byte)(queuePDUs[1] + 0x80), 0x0B };
+        byte PDU[] = { queueData[0], (byte)(queueData[1] + 0x80), 0x0B };
         crc = 0xFFFF;
         for (byte i = 0; i < sizeof(PDU); i++) {
           calculateCRC(PDU[i]);
         }
         switch (myHeader.clientNum) {
-          case SCAN_REQUEST:
-            break;
           case UDP_REQUEST:
             Udp.beginPacket(myHeader.remIP, myHeader.remPort);
             if (!localConfig.enableRtuOverTcp) {
@@ -192,7 +191,7 @@ void recvSerial() {
       deleteRequest();
     }  // if (myHeader.atts >= MAX_RETRY)
     serialState = IDLE;
-  }  // if (requestTimeout.isOver() && expectingData == true)
+  }  // if (serialState == WAITING && requestTimeout.isOver())
 }
 
 bool checkCRC(byte buf[], int len) {

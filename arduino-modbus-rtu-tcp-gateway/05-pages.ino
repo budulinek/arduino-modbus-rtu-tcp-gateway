@@ -16,6 +16,7 @@
    - renders the "please wait" message instead of the content (= request page number 0xFF, will be forwarded to home page after 5 seconds)
 
    helperInput
+   helperStats
    - renders some repetitive HTML code for inputs
 
    send404, send204
@@ -161,6 +162,7 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(version[1], HEX);
   chunked.print(F("<tr><td>Microcontroller:<td>"));
   chunked.print(BOARD);
+  // chunked.print(freeMemory());
   chunked.print(F("<tr><td>Ethernet Chip:<td>"));
   switch (Ethernet.hardwareStatus()) {
     case EthernetW5100:
@@ -200,8 +202,19 @@ void contentStatus(ChunkedPrint &chunked) {
 
   chunked.print(F("<tr><td>IP Address:<td>"));
   chunked.print(Ethernet.localIP());
+  chunked.print(F("<tr><td>Requests Queue:<td>"));
+  chunked.print(queueDataSize);
+  chunked.print(F(" / "));
+  chunked.print(maxQueueData);
+  chunked.print(F(" bytes, "));
+  chunked.print(queueHeadersSize);
+  chunked.print(F(" / "));
+  chunked.print(maxQueueRequests);
+  chunked.print(F(" requests"));
+  queueDataSize = 0;
+  queueHeadersSize = 0;
 
-#ifdef ENABLE_EXTRA_DIAG
+  #ifdef ENABLE_EXTRA_DIAG
   chunked.print(F("<tr><td>Run Time:<td>"));
   byte mod_seconds = byte((seconds) % 60);
   byte mod_minutes = byte((seconds / 60) % 60);
@@ -323,21 +336,15 @@ void contentStatus(ChunkedPrint &chunked) {
 
   chunked.print(F("<tr><td><br>"
                   "<tr><td>Modbus Stats:<td>"));
-  chunked.print(errorCount[STAT_OK]);
-  chunked.print(F(" Slave Responded"
-                  "<tr><td><td>"));
-  chunked.print(errorCount[STAT_ERROR_0X]);
-  chunked.print(F(" Slave Responded with Error (Codes 1~8)"
-                  "<tr><td><td>"));
-  chunked.print(errorCount[STAT_ERROR_0A]);
-  chunked.print(F(" Gateway Overloaded (Code 10)"
-                  "<tr><td><td>"));
-  chunked.print(errorCount[STAT_ERROR_0B]);
-  chunked.print(F(" Slave Failed to Respond (Code 11)"
-                  "<tr><td><td>"));
+  for (byte i = 0; i < STAT_NUM; i++) {
+    if (i == STAT_ERROR_0B_QUEUE) continue;
+    chunked.print(errorCount[i]);
+    helperStats(chunked, i);
+    chunked.print(F("<tr><td><td>"));
+  }
   chunked.print(errorInvalid);
-  chunked.print(F(" Invalid Request (Dropped by Gateway)"));
-  chunked.print(F("<tr><td><br>"
+  chunked.print(F(" Invalid Request (Dropped by Gateway)"
+                  "<tr><td><br>"
                   "<tr><td>Modbus TCP/UDP Masters:"));
   byte countMasters = 0;
   for (byte i = 0; i < maxSockNum; i++) {
@@ -374,22 +381,7 @@ void contentStatus(ChunkedPrint &chunked) {
           chunked.print(F(" Scanning..."));
           break;
         }
-        switch (s) {
-          case STAT_OK:
-            chunked.print(F(" Slave Responded"));
-            break;
-          case STAT_ERROR_0X:
-            chunked.print(F(" Slave Responded with Error (Codes 1~8)"));
-            break;
-          case STAT_ERROR_0A:
-            chunked.print(F(" Gateway Overloaded (Code 10)"));
-            break;
-          case STAT_ERROR_0B:
-            chunked.print(F(" Slave Failed to Respond (Code 11)"));
-            break;
-          default:
-            break;
-        }
+        helperStats(chunked, s);
       }
     }
   }
@@ -614,6 +606,26 @@ void contentWait(ChunkedPrint &chunked) {
 // Functions providing snippets of repetitive HTML code
 void helperInput(ChunkedPrint &chunked) {
   chunked.print(F("<td><input size=7 required type=number name="));
+}
+
+void helperStats(ChunkedPrint &chunked, const byte stat) {
+  switch (stat) {
+    case STAT_OK:
+      chunked.print(F(" Slave Responded"));
+      break;
+    case STAT_ERROR_0X:
+      chunked.print(F(" Slave Responded with Error (Codes 1~8)"));
+      break;
+    case STAT_ERROR_0A:
+      chunked.print(F(" Gateway Overloaded (Code 10)"));
+      break;
+    case STAT_ERROR_0B:
+    case STAT_ERROR_0B_QUEUE:
+      chunked.print(F(" Slave Failed to Respond (Code 11)"));
+      break;
+    default:
+      break;
+  }
 }
 
 void send404(EthernetClient &client) {

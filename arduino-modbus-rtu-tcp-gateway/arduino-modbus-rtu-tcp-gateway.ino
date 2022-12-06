@@ -58,8 +58,8 @@ const byte version[] = { 4, 0 };
 
 /****** ADVANCED SETTINGS ******/
 
-const byte reqQueueCount = 10;                                // max number of TCP or UDP requests stored in a queue
-const int reqQueueSize = 256;                                 // total length of TCP or UDP requests stored in a queue (in bytes)
+const byte maxQueueRequests = 10;                                // max number of TCP or UDP requests stored in a queue
+const int maxQueueData = 256;                                 // total length of TCP or UDP requests stored in a queue (in bytes)
 const byte maxSlaves = 247;                                   // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
 const int modbusSize = 256;                                   // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
 #define mySerial Serial                                       // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
@@ -105,8 +105,8 @@ typedef struct
 */
 
 const config_type defaultConfig = {
-  {},                    // macEnd (last 3 bytes)
-  false,                 // enableDhcp
+  {},     // macEnd (last 3 bytes)
+  false,  // enableDhcp
   { 192, 168, 1, 254 },  // ip
   { 255, 255, 255, 0 },  // subnet
   { 192, 168, 1, 1 },    // gateway
