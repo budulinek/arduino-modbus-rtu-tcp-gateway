@@ -16,8 +16,8 @@
 
    ***************************************************************** */
 
-const byte webInBufferSize = 128;  // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
-const byte smallbuffersize = 32;   // a smaller buffer for uri
+const byte WEB_IN_BUFFER_SIZE = 128;  // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
+const byte SMALL_BUFFER_SIZE = 32;   // a smaller buffer for uri
 
 // Actions that need to be taken after saving configuration.
 // These actions are also used by buttons on the Tools page.
@@ -84,11 +84,11 @@ enum post_key : byte {
 void recvWeb() {
   EthernetClient client = webServer.available();
   if (client) {
-    char uri[smallbuffersize];  // the requested page
-    // char requestParameter[smallbuffersize];      // parameter appended to the URI after a ?
-    // char postParameter[smallbuffersize] {'\0'};         // parameter transmitted in the body / by POST
+    char uri[SMALL_BUFFER_SIZE];  // the requested page
+    // char requestParameter[SMALL_BUFFER_SIZE];      // parameter appended to the URI after a ?
+    // char postParameter[SMALL_BUFFER_SIZE] {'\0'};         // parameter transmitted in the body / by POST
     if (client.available()) {
-      char webInBuffer[webInBufferSize]{ '\0' };  // buffer for incoming data
+      char webInBuffer[WEB_IN_BUFFER_SIZE]{ '\0' };  // buffer for incoming data
       unsigned int i = 0;                         // index / current read position
       enum status_type : byte {
         REQUEST,
@@ -116,7 +116,7 @@ void recvWeb() {
           i = 0;
           memset(webInBuffer, 0, sizeof(webInBuffer));
         } else {
-          if (i < (webInBufferSize - 1))  // <==== BUG FOUND
+          if (i < (WEB_IN_BUFFER_SIZE - 1))
           {
             webInBuffer[i] = c;
             i++;
@@ -306,7 +306,7 @@ void processPost(char postParameter[]) {
       {
         byte tempMac[3];
         memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
-        localConfig = defaultConfig;
+        localConfig = DEFAULT_CONFIG;
         memcpy(localConfig.macEnd, tempMac, 3);
         break;
       }
@@ -329,7 +329,7 @@ void processPost(char postParameter[]) {
       break;
   }
   // new parameter values received, save them to EEPROM
-  EEPROM.put(configStart + 1, localConfig);  // it is safe to call, only changed values are updated
+  EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
   if (action == SERIAL_SOFT) {               // can do it without "please wait" page
     Serial.flush();
     Serial.end();

@@ -57,11 +57,11 @@ void startSerial() {
 }
 
 void startEthernet() {
-  if (ethResetPin != 0) {
-    pinMode(ethResetPin, OUTPUT);
-    digitalWrite(ethResetPin, LOW);
+  if (ETH_RESET_PIN != 0) {
+    pinMode(ETH_RESET_PIN, OUTPUT);
+    digitalWrite(ETH_RESET_PIN, LOW);
     delay(25);
-    digitalWrite(ethResetPin, HIGH);
+    digitalWrite(ETH_RESET_PIN, HIGH);
     delay(500);
   }
   byte mac[6];
@@ -121,9 +121,8 @@ void maintainUptime() {
 #ifdef ENABLE_EXTRA_DIAG
 void maintainCounters() {
   // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively
-  const unsigned long rollover = 0xFFFFFF00;
-  const unsigned int rollover = 0xFF00;
-  if (serialTxCount > rollover || serialRxCount > rollover || ethTxCount > rollover || ethRxCount > rollover) {
+  const unsigned long ROLLOVER = 0xFFFFFF00;
+  if (serialTxCount > ROLLOVER || serialRxCount > ROLLOVER || ethTxCount > ROLLOVER || ethRxCount > ROLLOVER) {
     ethRxCount = 0;
     ethTxCount = 0;
     serialRxCount = 0;

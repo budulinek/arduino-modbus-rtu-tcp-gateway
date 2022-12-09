@@ -41,7 +41,7 @@
 
 */
 
-const byte version[] = { 4, 0 };
+const byte VERSION[] = { 4, 0 };
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -58,17 +58,14 @@ const byte version[] = { 4, 0 };
 
 /****** ADVANCED SETTINGS ******/
 
-const byte maxQueueRequests = 10;                             // max number of TCP or UDP requests stored in a queue
-const int maxQueueData = 256;                                 // total length of TCP or UDP requests stored in a queue (in bytes)
-const byte maxSlaves = 247;                                   // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
-const int modbusSize = 256;                                   // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
-#define mySerial Serial                                       // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
-#define RS485_CONTROL_PIN 6                                   // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
-const byte ethResetPin = 7;                                   // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
-const byte scanCommand[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
-
-// #define DEBUG            // Main Serial (USB) is used for printing some debug info, not for Modbus RTU. At the moment, only web server related debug messages are printed.
-#define debugSerial Serial
+const byte MAX_QUEUE_REQUESTS = 10;                            // max number of TCP or UDP requests stored in a queue
+const int MAX_QUEUE_DATA = 256;                                // total length of TCP or UDP requests stored in a queue (in bytes)
+const byte MAX_SLAVES = 247;                                   // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
+const int MODBUS_SIZE = 256;                                   // size of a MODBUS RTU frame (determines size of serialInBuffer and tcpInBuffer)
+#define mySerial Serial                                        // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
+#define RS485_CONTROL_PIN 6                                    // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
+const byte ETH_RESET_PIN = 7;                                  // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
+const byte SCAN_COMMAND[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
 
 /****** EXTRA FUNCTIONS ******/
 
@@ -104,7 +101,7 @@ typedef struct
   2) VERSION_MAJOR changes (factory reset configuration AND generates new MAC)
 */
 
-const config_type defaultConfig = {
+const config_type DEFAULT_CONFIG = {
   {},     // macEnd (last 3 bytes)
   false,  // enableDhcp
   { 192, 168, 1, 254 },  // ip
@@ -123,13 +120,13 @@ const config_type defaultConfig = {
 // local configuration values (stored in RAM)
 config_type localConfig;
 // Start address where config is saved in EEPROM
-const byte configStart = 128;
+const byte CONFIG_START = 128;
 
 /****** ETHERNET AND SERIAL ******/
 
 #ifdef UDP_TX_PACKET_MAX_SIZE
 #undef UDP_TX_PACKET_MAX_SIZE
-#define UDP_TX_PACKET_MAX_SIZE modbusSize
+#define UDP_TX_PACKET_MAX_SIZE MODBUS_SIZE
 #endif
 
 #ifdef MAX_SOCK_NUM     // Ethernet.h library determines MAX_SOCK_NUM by Microcontroller RAM (not by Ethernet chip type).
@@ -148,9 +145,6 @@ const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };
 EthernetUDP Udp;
 EthernetServer modbusServer(502);
 EthernetServer webServer(80);
-
-#define UDP_REQUEST 0xFF   // We store these codes in "header.clientNum" in order to differentiate
-#define SCAN_REQUEST 0xFE  // between TCP requests (their clientNum is nevew higher than 0x07), UDP requests and scan requests (triggered by scan button)
 
 /****** TIMERS AND STATE MACHINE ******/
 
@@ -223,9 +217,6 @@ unsigned long serialTxCount = 0;
 unsigned long serialRxCount = 0;
 unsigned long ethTxCount = 0;
 unsigned long ethRxCount = 0;
-#else
-// unsigned int serialTxCount = 0;
-// unsigned int serialRxCount = 0;
 #endif /* ENABLE_EXTRA_DIAG */
 
 /****** SETUP: RUNS ONCE ******/
@@ -234,16 +225,16 @@ void setup() {
   CreateTrulyRandomSeed();
 
   // is config already stored in EEPROM?
-  if (EEPROM.read(configStart) == version[0]) {
-    // load (configStart) the local configuration struct from EEPROM
-    EEPROM.get(configStart + 1, localConfig);
+  if (EEPROM.read(CONFIG_START) == VERSION[0]) {
+    // load (CONFIG_START) the local configuration struct from EEPROM
+    EEPROM.get(CONFIG_START + 1, localConfig);
   } else {
     // load (overwrite) the local configuration struct from defaults and save them to EEPROM
-    localConfig = defaultConfig;
+    localConfig = DEFAULT_CONFIG;
     // generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
     generateMac();
-    EEPROM.write(configStart, version[0]);
-    EEPROM.put(configStart + 1, localConfig);
+    EEPROM.write(CONFIG_START, VERSION[0]);
+    EEPROM.put(CONFIG_START + 1, localConfig);
   }
   startSerial();
   startEthernet();

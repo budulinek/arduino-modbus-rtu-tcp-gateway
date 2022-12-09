@@ -24,10 +24,10 @@
 
    ***************************************************************** */
 
-const byte webOutBufferSize = 128;  // size of web server write buffer (used by StreamLib)
+const byte WEB_OUT_BUFFER_SIZE = 128;  // size of web server write buffer (used by StreamLib)
 
 void sendPage(EthernetClient &client, byte reqPage) {
-  char webOutBuffer[webOutBufferSize];
+  char webOutBuffer[WEB_OUT_BUFFER_SIZE];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
   chunked.print(F("HTTP/1.1 200 OK\r\n"
                   "Connection: close\r\n"
@@ -156,9 +156,9 @@ void menuItem(ChunkedPrint &chunked, byte item) {
 //        Current Status
 void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>SW Version:<td>"));
-  chunked.print(version[0], HEX);
+  chunked.print(VERSION[0], HEX);
   chunked.print(F("."));
-  chunked.print(version[1], HEX);
+  chunked.print(VERSION[1], HEX);
   chunked.print(F("<tr><td>Microcontroller:<td>"));
   chunked.print(BOARD);
   // chunked.print(freeMemory());
@@ -327,12 +327,12 @@ void contentStatus(ChunkedPrint &chunked) {
                   "<tr><td>Requests Queue:<td>"));
   chunked.print(queueDataSize);
   chunked.print(F(" / "));
-  chunked.print(maxQueueData);
+  chunked.print(MAX_QUEUE_DATA);
   chunked.print(F(" bytes"
                   "<tr><td><td>"));
   chunked.print(queueHeadersSize);
   chunked.print(F(" / "));
-  chunked.print(maxQueueRequests);
+  chunked.print(MAX_QUEUE_REQUESTS);
   chunked.print(F(" requests"));
   queueDataSize = 0;
   queueHeadersSize = 0;
@@ -368,7 +368,7 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(SCAN);
   chunked.print(F(">Scan & Reset Stats</button>"));
   byte countSlaves = 0;
-  for (int k = 1; k < maxSlaves; k++) {
+  for (int k = 1; k < MAX_SLAVES; k++) {
     for (int s = 0; s < STAT_NUM; s++) {
       if (getSlaveStatus(k, s) == true || k == scanCounter) {
         countSlaves++;
@@ -583,7 +583,7 @@ void contentTools(ChunkedPrint &chunked) {
   chunked.print(F(" value="));
   chunked.print(FACTORY);
   chunked.print(F(">Restore</button> (Static IP: "));
-  chunked.print((IPAddress)defaultConfig.ip);
+  chunked.print((IPAddress)DEFAULT_CONFIG.ip);
   chunked.print(F(")"
                   "<tr><td>MAC Address: <td><button name="));
   chunked.print(POST_ACTION);
