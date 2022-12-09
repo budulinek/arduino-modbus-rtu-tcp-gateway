@@ -162,6 +162,7 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>Microcontroller:<td>"));
   chunked.print(BOARD);
   // chunked.print(freeMemory());
+  // chunked.print(frameDelay);
   chunked.print(F("<tr><td>Ethernet Chip:<td>"));
   switch (Ethernet.hardwareStatus()) {
     case EthernetW5100:
@@ -201,19 +202,8 @@ void contentStatus(ChunkedPrint &chunked) {
 
   chunked.print(F("<tr><td>IP Address:<td>"));
   chunked.print(Ethernet.localIP());
-  chunked.print(F("<tr><td>Requests Queue:<td>"));
-  chunked.print(queueDataSize);
-  chunked.print(F(" / "));
-  chunked.print(maxQueueData);
-  chunked.print(F(" bytes, "));
-  chunked.print(queueHeadersSize);
-  chunked.print(F(" / "));
-  chunked.print(maxQueueRequests);
-  chunked.print(F(" requests"));
-  queueDataSize = 0;
-  queueHeadersSize = 0;
 
-  #ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTRA_DIAG
   chunked.print(F("<tr><td>Run Time:<td>"));
   byte mod_seconds = byte((seconds) % 60);
   byte mod_minutes = byte((seconds / 60) % 60);
@@ -334,16 +324,26 @@ void contentStatus(ChunkedPrint &chunked) {
 #endif /* ENABLE_EXTRA_DIAG */
 
   chunked.print(F("<tr><td><br>"
-                  "<tr><td>Modbus Stats:<td>"));
-  for (byte i = 0; i < STAT_NUM; i++) {
-    if (i == STAT_ERROR_0B_QUEUE) continue;
+                  "<tr><td>Requests Queue:<td>"));
+  chunked.print(queueDataSize);
+  chunked.print(F(" / "));
+  chunked.print(maxQueueData);
+  chunked.print(F(" bytes"
+                  "<tr><td><td>"));
+  chunked.print(queueHeadersSize);
+  chunked.print(F(" / "));
+  chunked.print(maxQueueRequests);
+  chunked.print(F(" requests"));
+  queueDataSize = 0;
+  queueHeadersSize = 0;
+  chunked.print(F("<tr><td>Modbus Stats:<td>"));
+  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // ignore STAT_ERROR_0B_QUEUE
     chunked.print(errorCount[i]);
     helperStats(chunked, i);
     chunked.print(F("<tr><td><td>"));
   }
   chunked.print(errorInvalid);
-  chunked.print(F(" Invalid Request (Dropped by Gateway)"
-                  "<tr><td><br>"
+  chunked.print(F(" Invalid TCP/UDP Request"
                   "<tr><td>Modbus TCP/UDP Masters:"));
   byte countMasters = 0;
   for (byte i = 0; i < maxSockNum; i++) {
@@ -362,8 +362,7 @@ void contentStatus(ChunkedPrint &chunked) {
     }
   }
   if (countMasters == 0) chunked.print(F("<td>None"));
-  chunked.print(F("<tr><td><br>"
-                  "<tr><td>Modbus RTU Slaves:<td><button name="));
+  chunked.print(F("<tr><td>Modbus RTU Slaves:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(SCAN);

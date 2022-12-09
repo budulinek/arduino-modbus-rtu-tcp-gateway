@@ -26,7 +26,11 @@
 
    ***************************************************************** */
 
-#define ADDRESS_POS (6 * !localConfig.enableRtuOverTcp)  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
+// Stored in "header.requestType" 
+#define PRIORITY_REQUEST B10000000  // Request to slave which is not "nonresponding"
+#define SCAN_REQUEST B01000000 // Request triggered by slave scanner
+#define UDP_REQUEST B00100000 // UDP request
+#define TCP_REQUEST B00001111 // TCP request, also stores TCP client number
 
 enum status : byte {
   STAT_OK,              // Slave Responded
@@ -40,8 +44,10 @@ enum status : byte {
 // bool arrays for storing Modbus RTU status of individual slaves
 uint8_t stat[STAT_NUM][(maxSlaves + 1 + 7) / 8];
 
-// Scan request is in queue
-bool scanInQueue = false;
+// Scan request is in the queue
+bool scanReqInQueue = false;
+// Counter for priority requests in the queue
+byte priorityReqInQueue;
 
 // array for storing error counts
 uint16_t errorCount[STAT_NUM];
@@ -57,7 +63,7 @@ typedef struct {
   byte msgLen;           // lenght of Modbus message stored in queueData
   IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
   unsigned int remPort;  // remote port for UDP client (UDP response is sent back to remote port)
-  byte clientNum;        // TCP client who sent the request, UDP_REQUEST (0xFF) designates UDP client
+  byte requestType;        // TCP client who sent the request
   byte atts;             // attempts counter
 } header;
 
@@ -146,16 +152,16 @@ void recvTcp() {
 
 void processRequests() {
   // Insert scan request into queue, allow only one scan request in a queue
-  if (scanCounter != 0 && queueHeaders.available() > 1 && queueData.available() > sizeof(scanCommand) + 1 && scanInQueue == false) {
-    scanInQueue = true;
+  if (scanCounter != 0 && queueHeaders.available() > 1 && queueData.available() > sizeof(scanCommand) + 1 && scanReqInQueue == false) {
+    scanReqInQueue = true;
     // Store scan request in request queue
     queueHeaders.push(header{
       { 0x00, 0x00 },                  // tid[2]
       sizeof(scanCommand) + 1,         // msgLen
       {},                              // remIP
       0,                               // remPort
-      SCAN_REQUEST,                    // clientNum
-      localConfig.serialAttempts - 1,  // atts
+      SCAN_REQUEST,                    // requestType
+      0,  // atts
     });
     queueData.push(scanCounter);  // address of the scanned slave
     for (byte i = 0; i < sizeof(scanCommand); i++) {
@@ -167,21 +173,19 @@ void processRequests() {
   // Optimize queue (prioritize requests from responding slaves) and trigger sending via serial
   if (serialState == IDLE) {  // send new data over serial only if we are not waiting for response
     if (!queueHeaders.isEmpty()) {
-      // boolean queueHasRespondingSlaves;  // true if  queue holds at least one request to responding slaves
-      // for (byte i = 0; i < queueHeaders.size(); i++) {
-      //   if (getSlaveStatus(queueHeaders[i].uid, statOk) == true) {
-      //     queueHasRespondingSlaves = true;
-      //     break;
-      //   } else {
-      //     queueHasRespondingSlaves = false;
-      //   }
-      // }
+      while (priorityReqInQueue && (queueHeaders.first().requestType & PRIORITY_REQUEST) == false) {
+        // move requests to non responding slaves to the tail of the queue
+        for (byte i = 0; i < queueHeaders.first().msgLen; i++) {
+          queueData.push(queueData.shift());
+        }
+        queueHeaders.push(queueHeaders.shift());
+      }
       serialState = SENDING;  // trigger sendSerial()
     }
   }
 }
 
-byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress remoteIP, const unsigned int remotePort, const byte clientNum) {
+byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress remoteIP, const unsigned int remotePort, byte requestType) {
   byte addressPos = 6 * !localConfig.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
   if (localConfig.enableRtuOverTcp) {                   // check CRC for Modbus RTU over TCP/UDP
     if (checkCRC(inBuffer, msgLength) == false) {
@@ -207,15 +211,20 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
   } else if (getSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B)) {
     setSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B_QUEUE, true);
   }
-  
+
   // all checkes passed OK, we can store the incoming data in request queue
+  // Add PRIORITY_REQUEST flag to requests for responding slaves
+  if (getSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B_QUEUE) == false) {
+    requestType = requestType | PRIORITY_REQUEST;
+    priorityReqInQueue++;
+  }
   // Store in request queue
   queueHeaders.push(header{
     { inBuffer[0], inBuffer[1] },  // tid[2] (ignored in Modbus RTU over TCP/UDP)
     (byte)msgLength,               // msgLen
     (IPAddress)remoteIP,           // remIP
     (unsigned int)remotePort,      // remPort
-    (byte)clientNum,               // clientNum
+    (byte)(requestType),             // requestType
     0,                             // atts
   });
   for (byte i = 0; i < msgLength; i++) {
@@ -228,8 +237,10 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
 
 void deleteRequest()  // delete request from queue
 {
-  if (queueHeaders.first().clientNum == SCAN_REQUEST) scanInQueue = false;
-  for (byte i = 0; i < queueHeaders.first().msgLen; i++) {
+  header myHeader = queueHeaders.first();
+  if (myHeader.requestType & SCAN_REQUEST) scanReqInQueue = false;
+  if (myHeader.requestType & PRIORITY_REQUEST) priorityReqInQueue--;
+  for (byte i = 0; i < myHeader.msgLen; i++) {
     queueData.shift();
   }
   queueHeaders.shift();
