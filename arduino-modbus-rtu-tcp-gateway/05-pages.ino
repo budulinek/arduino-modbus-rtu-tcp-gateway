@@ -162,7 +162,8 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>Microcontroller:<td>"));
   chunked.print(BOARD);
   // chunked.print(freeMemory());
-  // chunked.print(frameDelay);
+//  chunked.print(serialState, HEX);
+
   chunked.print(F("<tr><td>Ethernet Chip:<td>"));
   switch (Ethernet.hardwareStatus()) {
     case EthernetW5100:
@@ -323,8 +324,7 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("</table>"));
 #endif /* ENABLE_EXTRA_DIAG */
 
-  chunked.print(F("<tr><td><br>"
-                  "<tr><td>Requests Queue:<td>"));
+  chunked.print(F("<tr><td>Requests Queue:<td>"));
   chunked.print(queueDataSize);
   chunked.print(F(" / "));
   chunked.print(MAX_QUEUE_DATA);
@@ -334,16 +334,22 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F(" / "));
   chunked.print(MAX_QUEUE_REQUESTS);
   chunked.print(F(" requests"));
-  queueDataSize = 0;
-  queueHeadersSize = 0;
+  queueDataSize = queueData.size();
+  queueHeadersSize = queueHeaders.size();
   chunked.print(F("<tr><td>Modbus Stats:<td>"));
-  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // ignore STAT_ERROR_0B_QUEUE
+  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // there is no counter for STAT_ERROR_0B_QUEUE
     chunked.print(errorCount[i]);
     helperStats(chunked, i);
     chunked.print(F("<tr><td><td>"));
   }
-  chunked.print(errorInvalid);
+  chunked.print(errorTcpCount);
   chunked.print(F(" Invalid TCP/UDP Request"
+                  "<tr><td><td>"));
+  chunked.print(errorRtuCount);
+  chunked.print(F(" Invalid RS485 Response"
+                  "<tr><td><td>"));
+  chunked.print(errorTimeoutCount);
+  chunked.print(F(" Response Timeout"
                   "<tr><td>Modbus TCP/UDP Masters:"));
   byte countMasters = 0;
   for (byte i = 0; i < maxSockNum; i++) {
@@ -366,7 +372,7 @@ void contentStatus(ChunkedPrint &chunked) {
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(SCAN);
-  chunked.print(F(">Scan & Reset Stats</button>"));
+  chunked.print(F(">Scan Slaves & Reset Stats</button>"));
   byte countSlaves = 0;
   for (int k = 1; k < MAX_SLAVES; k++) {
     for (int s = 0; s < STAT_NUM; s++) {

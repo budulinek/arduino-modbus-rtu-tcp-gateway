@@ -317,7 +317,9 @@ void processPost(char postParameter[]) {
       scanCounter = 1;
       memset(&stat, 0, sizeof(stat));  // clear all status flags
       memset(errorCount, 0, sizeof(errorCount));
-      errorInvalid = 0;
+      errorTcpCount = 0;
+      errorRtuCount = 0;
+      errorTimeoutCount = 0;
 #ifdef ENABLE_EXTRA_DIAG
       ethRxCount = 0;
       ethTxCount = 0;

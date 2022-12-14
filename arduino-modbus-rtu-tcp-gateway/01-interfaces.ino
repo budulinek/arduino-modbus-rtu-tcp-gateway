@@ -36,24 +36,20 @@
 
 void startSerial() {
   mySerial.begin(localConfig.baud, localConfig.serialConfig);
-  // Calculate Modbus RTU character timeout and frame delay
-  byte bits =                                                    // number of bits per character (11 in default Modbus RTU settings)
-    1 +                                                          // start bit
-    (((localConfig.serialConfig & 0x06) >> 1) + 5) +             // data bits
-    (((localConfig.serialConfig & 0x08) >> 3) + 1);              // stop bits
-  if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;   // parity bit (if present)
-  int T = ((unsigned long)bits * 1000000UL) / localConfig.baud;  // time to send 1 character over serial in microseconds
-  if (localConfig.baud <= 19200) {
-    charTimeout = 1.5 * T;  // inter-character time-out should be 1,5T
-    frameDelay = 3.5 * T;   // inter-frame delay should be 3,5T
-  } else {
-    charTimeout = 750;
-    frameDelay = 1750;
-  }
 #ifdef RS485_CONTROL_PIN
   pinMode(RS485_CONTROL_PIN, OUTPUT);
   digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Init Transceiver
 #endif                                             /* RS485_CONTROL_PIN */
+}
+
+// time to send 1 character over serial in microseconds
+unsigned long charTime() {                                      
+  byte bits =                                                   // number of bits per character (11 in default Modbus RTU settings)
+    1 +                                                         // start bit
+    (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
+    (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
+  if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
+  return ((unsigned long)bits * 1000000UL) / localConfig.baud;
 }
 
 void startEthernet() {
@@ -253,22 +249,3 @@ ISR(WDT_vect) {
 
 
 
-
-
-#ifdef __arm__
-// should use uinstd.h to define sbrk but Due causes a conflict
-extern "C" char* sbrk(int incr);
-#else  // __ARM__
-extern char *__brkval;
-#endif  // __arm__
-
-int freeMemory() {
-  char top;
-#ifdef __arm__
-  return &top - reinterpret_cast<char*>(sbrk(0));
-#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
-  return &top - __brkval;
-#else  // __arm__
-  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
-#endif  // __arm__
-}

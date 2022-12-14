@@ -65,7 +65,10 @@ const int MODBUS_SIZE = 256;                                   // size of a MODB
 #define mySerial Serial                                        // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
 #define RS485_CONTROL_PIN 6                                    // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
 const byte ETH_RESET_PIN = 7;                                  // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
-const byte SCAN_COMMAND[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected if any response (even error) is received.
+const int SCAN_TIMEOUT = 500;                                 // Timeout (ms) for scan requests
+const byte SCAN_COMMAND[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected as "Responding" if any response (even error) is received.
+const int FRAME_DELAY = 30;                                   // Delay (ms) between the end of reading Modbus RTU frame and writing new frame.
+                                                               // Value 0 means automatic configuration based on baud rate according to Modbus specification (3.5 characters)
 
 /****** EXTRA FUNCTIONS ******/
 
@@ -166,38 +169,17 @@ void MicroTimer::sleep(unsigned long sleepTimeMs) {
   this->sleepTimeMs = sleepTimeMs;
   timestampLastHitMs = micros();
 }
-class Timer {
-private:
-  unsigned long timestampLastHitMs;
-  unsigned long sleepTimeMs;
-public:
-  boolean isOver();
-  void sleep(unsigned long sleepTimeMs);
-};
-boolean Timer::isOver() {
-  if ((unsigned long)(millis() - timestampLastHitMs) > sleepTimeMs) {
-    return true;
-  }
-  return false;
-}
-void Timer::sleep(unsigned long sleepTimeMs) {
-  this->sleepTimeMs = sleepTimeMs;
-  timestampLastHitMs = millis();
-}
-Timer requestTimeout;
 uint16_t crc;
 #define RS485_TRANSMIT HIGH
 #define RS485_RECEIVE LOW
-byte scanCounter = 0;
+byte scanCounter = 1;  // scan RS485 line after boot
 enum state : byte {
   IDLE,
   SENDING,
   DELAY,
   WAITING
 };
-enum state serialState;
-unsigned int charTimeout;
-unsigned int frameDelay;
+byte serialState;
 
 /****** RUN TIME AND DATA COUNTERS ******/
 
@@ -245,7 +227,7 @@ void setup() {
 void loop() {
   recvUdp();
   recvTcp();
-  processRequests();
+  scanRequest();
   sendSerial();
   recvSerial();
   recvWeb();
