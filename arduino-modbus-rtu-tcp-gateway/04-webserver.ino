@@ -17,7 +17,7 @@
    ***************************************************************** */
 
 const byte WEB_IN_BUFFER_SIZE = 128;  // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
-const byte SMALL_BUFFER_SIZE = 32;   // a smaller buffer for uri
+const byte SMALL_BUFFER_SIZE = 32;    // a smaller buffer for uri
 
 // Actions that need to be taken after saving configuration.
 // These actions are also used by buttons on the Tools page.
@@ -67,18 +67,18 @@ enum post_key : byte {
   POST_DNS,
   POST_DNS_1,
   POST_DNS_2,
-  POST_DNS_3,     // DNS                || all these 16 enum elements must be listed in succession!!  ||
-  POST_TCP,       // TCP port                  || Because HTML code for these 3 ports              ||
-  POST_UDP,       // UDP port                  || is generated through one for-loop,               ||
-  POST_WEB,       // web UI port               || these 3 elements must be listed in succession!!  ||
-  POST_RTU_OVER,  // RTU over TCP/UDP
-  POST_BAUD,      // baud rate
-  POST_DATA,      // data bits
-  POST_PARITY,    // parity
-  POST_STOP,      // stop bits
-  POST_TIMEOUT,   // response timeout
-  POST_ATTEMPTS,  // number of request attempts
-  POST_ACTION     // actions on Tools page
+  POST_DNS_3,       // DNS                || all these 16 enum elements must be listed in succession!!  ||
+  POST_TCP,         // TCP port                  || Because HTML code for these 3 ports              ||
+  POST_UDP,         // UDP port                  || is generated through one for-loop,               ||
+  POST_WEB,         // web UI port               || these 3 elements must be listed in succession!!  ||
+  POST_RTU_OVER,    // RTU over TCP/UDP
+  POST_BAUD,        // baud rate
+  POST_DATA,        // data bits
+  POST_PARITY,      // parity
+  POST_STOP,        // stop bits
+  POST_TIMEOUT,     // response timeout
+  POST_ATTEMPTS,    // number of request attempts
+  POST_ACTION       // actions on Tools page
 };
 
 void recvWeb() {
@@ -89,7 +89,7 @@ void recvWeb() {
     // char postParameter[SMALL_BUFFER_SIZE] {'\0'};         // parameter transmitted in the body / by POST
     if (client.available()) {
       char webInBuffer[WEB_IN_BUFFER_SIZE]{ '\0' };  // buffer for incoming data
-      unsigned int i = 0;                         // index / current read position
+      unsigned int i = 0;                            // index / current read position
       enum status_type : byte {
         REQUEST,
         CONTENT_LENGTH,
@@ -107,7 +107,7 @@ void recvWeb() {
             char *ptr;
             ptr = strtok(webInBuffer, " ");  // strtok willdestroy the newRequest
             ptr = strtok(NULL, " ");
-            strlcpy(uri, ptr, sizeof(uri));  // enthält noch evtl. parameter
+            strlcpy(uri, ptr, sizeof(uri));      // enthält noch evtl. parameter
             status = EMPTY_LINE;                 // jump to next status
           } else if (status > REQUEST && i < 2)  // check if we have an empty line
           {
@@ -116,8 +116,7 @@ void recvWeb() {
           i = 0;
           memset(webInBuffer, 0, sizeof(webInBuffer));
         } else {
-          if (i < (WEB_IN_BUFFER_SIZE - 1))
-          {
+          if (i < (WEB_IN_BUFFER_SIZE - 1)) {
             webInBuffer[i] = c;
             i++;
             webInBuffer[i] = '\0';
@@ -142,8 +141,6 @@ void recvWeb() {
     // Actions that require "please wait" page
     if (action == WEB || action == REBOOT || action == ETH_SOFT || action == FACTORY || action == MAC) {
       reqPage = PAGE_WAIT;
-      // } else if (action == RESET_COUNTERS) {
-      //   reqPage = PAGE_STATUS;
     }
 
     // Send page
@@ -205,12 +202,14 @@ void processPost(char postParameter[]) {
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
         break;
+#ifdef ENABLE_DHCP
       case POST_DHCP:
         if ((byte)paramValueUlong != localConfig.enableDhcp) {
           action = ETH_SOFT;
           localConfig.enableDhcp = (byte)paramValueUlong;
         }
         break;
+#endif /* ENABLE_DHCP */
       case POST_IP ... POST_IP_3:
         if ((byte)paramValueUlong != localConfig.ip[paramKeyByte - POST_IP]) {
           action = ETH_SOFT;
@@ -332,7 +331,7 @@ void processPost(char postParameter[]) {
   }
   // new parameter values received, save them to EEPROM
   EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
-  if (action == SERIAL_SOFT) {               // can do it without "please wait" page
+  if (action == SERIAL_SOFT) {                // can do it without "please wait" page
     Serial.flush();
     Serial.end();
     startSerial();

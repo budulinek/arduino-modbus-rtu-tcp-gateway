@@ -42,14 +42,31 @@ void startSerial() {
 #endif                                             /* RS485_CONTROL_PIN */
 }
 
-// time to send 1 character over serial in microseconds
-unsigned long charTime() {                                      
+// time to send 1 character over serial in microseconds (never above 40 000 so we can use unsigned int)
+unsigned long charTime() {
   byte bits =                                                   // number of bits per character (11 in default Modbus RTU settings)
     1 +                                                         // start bit
     (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
     (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
   if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
-  return ((unsigned long)bits * 1000000UL) / localConfig.baud;
+  return (bits * 1000000UL) / (unsigned long)localConfig.baud;
+}
+
+unsigned long charTimeOut() {
+  if (localConfig.baud <= 19200) {
+    return 1.5 * charTime();  // inter-character time-out should be 1,5T
+  } else {
+    return 750;
+  }
+}
+
+unsigned long frameDelay() {
+  if (FRAME_DELAY) return FRAME_DELAY * 1000UL;
+  if (localConfig.baud <= 19200) {
+    return 3.5 * charTime();  // inter-frame delay should be 3,5T
+  } else {
+    return 1750;
+  }
 }
 
 void startEthernet() {
@@ -71,8 +88,8 @@ void startEthernet() {
     Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
   }
 #else  /* ENABLE_DHCP */
-  Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
-  localConfig.enableDhcp = false;  // Make sure Dhcp is disabled in config
+//   Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+  Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);
 #endif /* ENABLE_DHCP */
   modbusServer = EthernetServer(localConfig.tcpPort);
   webServer = EthernetServer(localConfig.webPort);
@@ -246,6 +263,3 @@ ISR(WDT_vect) {
 #endif
 
 #endif
-
-
-

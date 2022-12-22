@@ -18,7 +18,6 @@
 
 int rxNdx = 0;
 int txNdx = 0;
-bool rxErr = false;
 
 MicroTimer recvTimer;
 MicroTimer sendTimer;
@@ -65,11 +64,9 @@ void sendSerial() {
           // this if statement is not very reliable (too fast)
           // Serial.isFlushed() method is needed....see https://github.com/arduino/Arduino/pull/3737
           txNdx = 0;
-          unsigned long delay = 0;
 #ifdef RS485_CONTROL_PIN
-          delay = 3.5 * charTime();  // inter-frame delay should be 3,5T
-#endif                               /* RS485_CONTROL_PIN */
-          sendTimer.sleep(delay);
+          sendTimer.sleep(charTimeOut());  // very short delay before we toggle the RS485_CONTROL_PIN and disable RS485 transmit
+#endif                                     /* RS485_CONTROL_PIN */
           serialState++;
         }
       }
@@ -86,9 +83,9 @@ void sendSerial() {
         myHeader.atts++;
         queueHeaders.shift();
         queueHeaders.unshift(myHeader);
-        unsigned long delay = (unsigned long)localConfig.serialTimeout * 1000;
-        //       if (myHeader.requestType & SCAN_REQUEST) delay = SCAN_TIMEOUT * 1000;  // fixed timeout for scan requests
-        sendTimer.sleep(delay);
+        unsigned long delay = localConfig.serialTimeout;
+        if (myHeader.requestType & SCAN_REQUEST) delay = SCAN_TIMEOUT;  // fixed timeout for scan requests
+        sendTimer.sleep(delay * 1000UL);
         serialState++;
       }
       break;
@@ -134,7 +131,7 @@ void sendSerial() {
             }
           }
           deleteRequest();
-                    errorTimeoutCount++;
+          errorTimeoutCount++;
         } else {
           setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true);
           errorTimeoutCount++;
@@ -153,21 +150,18 @@ void recvSerial() {
     if (rxNdx < MODBUS_SIZE) {
       serialIn[rxNdx] = mySerial.read();
       rxNdx++;
-    } else {
-      mySerial.read();
-      rxErr = true;  // frame longer than maximum allowed
+    } else {            // frame longer than maximum allowed
+      mySerial.read();  // CRC will fail and errorRtuCount will be recorded down the road
     }
-    unsigned long delay = 750;
-    if (localConfig.baud <= 19200) {
-      delay = 1.5 * charTime();  // inter-character time-out should be 1,5T
-    }
-    recvTimer.sleep(delay);
+    recvTimer.sleep(charTimeOut());
+    sendTimer.sleep(frameDelay());  // delay next serial write
+//    sendTimer.sleep(localConfig.serialTimeout * 1000UL);  // delay next serial write
   }
   if (recvTimer.isOver() && rxNdx != 0) {
     // Process Serial data
     // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
-    if (!rxErr && checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
+    if (checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
       if (serialIn[1] > 0x80 && (myHeader.requestType & SCAN_REQUEST) == false) {
         setSlaveStatus(serialIn[0], STAT_ERROR_0X, true);
       } else {
@@ -209,15 +203,6 @@ void recvSerial() {
     serialRxCount += rxNdx;
 #endif /* ENABLE_EXTRA_DIAG */
     rxNdx = 0;
-    rxErr = false;
-    unsigned long delay = 1750;
-    if (localConfig.baud <= 19200) {
-      delay = 3.5 * charTime();  // inter-frame delay should be 3,5T
-    }
-    if (FRAME_DELAY) {
-      delay = FRAME_DELAY * 1000;
-    }
-    sendTimer.sleep(delay);  // delay next serial write
   }
 }
 

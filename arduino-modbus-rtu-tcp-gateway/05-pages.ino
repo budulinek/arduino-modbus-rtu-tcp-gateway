@@ -51,10 +51,11 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<style>"
                   "html,body{margin:0;height:100%;font-family:sans-serif}"
                   "a{text-decoration:none;color:white}"
+                  "table{width:100%;height:100%}"
+                  "th{height:0;text-align:left;background-color:#0067AC;color:white;padding:10px}"
                   "td:first-child {text-align:right;width:30%}"
-                  "th{text-align:left;background-color:#0067AC;color:white;padding:10px;height:0}"
-                  "table{width:100%}"
                   "h1{margin:0}"
+                  "#x{padding:0;display:block;height:calc(100vh - 70px);overflow-y:auto}"
                   "</style>"
                   "</head>"
                   "<body"));
@@ -63,10 +64,10 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
 #endif /* ENABLE_DHCP */
   chunked.print(F(">"
-                  "<table height=100%>"
+                  "<table>"
                   "<tr><th colspan=2>"
                   "<h1>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
-                  "<tr valign=top>"                                    // second row is left menu (first cell) and main page (second cell)
+                  "<tr>"                                    // second row is left menu (first cell) and main page (second cell)
                   "<th style=width:20%;padding:0>"
 
                   // Left Menu
@@ -82,7 +83,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
     menuItem(chunked, i);
     chunked.print(F("</a>"));
   }
-  chunked.print(F("</table><td style=padding:0>"));
+  chunked.print(F("<tr></table><td id=x>"));
 
   // Main Page
   chunked.print(F("<form action=/"));
@@ -176,7 +177,7 @@ void contentStatus(ChunkedPrint &chunked) {
       chunked.print(F("W5500"));
       break;
     default:  // TODO: add W6100 once it is included in Ethernet library
-      chunked.print(F("unknown"));
+      chunked.print(F("Unknown"));
       break;
   }
   chunked.print(F("<tr><td>Ethernet Sockets:<td>"));
@@ -568,12 +569,15 @@ void contentRtu(ChunkedPrint &chunked) {
     chunked.print(F("</option>"));
   }
   chunked.print(F("</select> bit"
+  //                   "<tr><td>Frame Delay:"));
+  // chunked.print(frameDelay());
+  // chunked.print(F(" μs"
                   "<tr><td>Response Timeout:"));
   helperInput(chunked);
   chunked.print(POST_TIMEOUT);
-  chunked.print(F(" min=100 max=2000 value="));
+  chunked.print(F(" min=50 max=2000 value="));
   chunked.print(localConfig.serialTimeout);
-  chunked.print(F("> (100~2000) ms"
+  chunked.print(F("> (50~2000) ms"
                   "<tr><td>Attempts:"));
   helperInput(chunked);
   chunked.print(POST_ATTEMPTS);
