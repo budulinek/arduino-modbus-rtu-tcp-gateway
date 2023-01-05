@@ -97,40 +97,14 @@ void sendSerial() {
           // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
           setSlaveStatus(queueData[0], STAT_ERROR_0B, true);
           byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
-          byte PDU[] = { queueData[0], (byte)(queueData[1] + 0x80), 0x0B };
-#ifdef ENABLE_EXTRA_DIAG
-          ethTxCount += 5;
-          if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
-#endif /* ENABLE_EXTRA_DIAG */
+          byte PDU[5] = { queueData[0], (byte)(queueData[1] + 0x80), 0x0B };
           crc = 0xFFFF;
-          for (byte i = 0; i < sizeof(PDU); i++) {
+          for (byte i = 0; i < 3; i++) {
             calculateCRC(PDU[i]);
           }
-          if (myHeader.requestType & UDP_REQUEST) {
-            Udp.beginPacket(myHeader.remIP, myHeader.remPort);
-            if (!localConfig.enableRtuOverTcp) {
-              Udp.write(MBAP, 6);
-            }
-            Udp.write(PDU, 3);
-            if (localConfig.enableRtuOverTcp) {
-              Udp.write(lowByte(crc));  // send CRC, low byte first
-              Udp.write(highByte(crc));
-            }
-            Udp.endPacket();
-          } else {
-            EthernetClient client = EthernetClient(myHeader.requestType & TCP_REQUEST);
-            if (client.connected()) {
-              if (!localConfig.enableRtuOverTcp) {
-                client.write(MBAP, 6);
-              }
-              client.write(PDU, 3);
-              if (localConfig.enableRtuOverTcp) {
-                client.write(lowByte(crc));  // send CRC, low byte first
-                client.write(highByte(crc));
-              }
-            }
-          }
-          deleteRequest();
+          PDU[3] = lowByte(crc);  // send CRC, low byte first
+          PDU[4] = highByte(crc);
+          sendResponse(MBAP, PDU, 5);
           errorTimeoutCount++;
         } else {
           setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true);
@@ -154,8 +128,7 @@ void recvSerial() {
       mySerial.read();  // CRC will fail and errorRtuCount will be recorded down the road
     }
     recvTimer.sleep(charTimeOut());
-    sendTimer.sleep(frameDelay());  // delay next serial write
-//    sendTimer.sleep(localConfig.serialTimeout * 1000UL);  // delay next serial write
+    sendTimer.sleep(localConfig.frameDelay * 1000UL);  // delay next serial write
   }
   if (recvTimer.isOver() && rxNdx != 0) {
     // Process Serial data
@@ -168,33 +141,7 @@ void recvSerial() {
         setSlaveStatus(serialIn[0], STAT_OK, true);
       }
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2) };
-      if (myHeader.requestType & UDP_REQUEST) {
-        Udp.beginPacket(myHeader.remIP, myHeader.remPort);
-        if (localConfig.enableRtuOverTcp) Udp.write(serialIn, rxNdx);
-        else {
-          Udp.write(MBAP, 6);
-          Udp.write(serialIn, rxNdx - 2);  //send without CRC
-        }
-        Udp.endPacket();
-#ifdef ENABLE_EXTRA_DIAG
-        ethTxCount += rxNdx;
-        if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
-#endif /* ENABLE_EXTRA_DIAG */
-      } else if (myHeader.requestType & TCP_REQUEST) {
-        EthernetClient client = EthernetClient(myHeader.requestType & TCP_REQUEST);
-        if (client.connected()) {
-          if (localConfig.enableRtuOverTcp) client.write(serialIn, rxNdx);
-          else {
-            client.write(MBAP, 6);
-            client.write(serialIn, rxNdx - 2);  //send without CRC
-          }
-#ifdef ENABLE_EXTRA_DIAG
-          ethTxCount += rxNdx;
-          if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
-#endif /* ENABLE_EXTRA_DIAG */
-        }
-      }
-      deleteRequest();
+      sendResponse(MBAP, serialIn, rxNdx);
       serialState = IDLE;
     } else {
       errorRtuCount++;
@@ -204,6 +151,37 @@ void recvSerial() {
 #endif /* ENABLE_EXTRA_DIAG */
     rxNdx = 0;
   }
+}
+
+void sendResponse(const byte MBAP[], const byte PDU[], const unsigned int pduLength) {
+  header myHeader = queueHeaders.first();
+  if (myHeader.requestType & UDP_REQUEST) {
+    Udp.beginPacket(myHeader.remIP, myHeader.remPort);
+    if (localConfig.enableRtuOverTcp) Udp.write(PDU, pduLength);
+    else {
+      Udp.write(MBAP, 6);
+      Udp.write(PDU, pduLength - 2);  //send without CRC
+    }
+    Udp.endPacket();
+#ifdef ENABLE_EXTRA_DIAG
+    ethTxCount += pduLength;
+    if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
+  } else if (myHeader.requestType & TCP_REQUEST) {
+    EthernetClient client = EthernetClient(myHeader.requestType & TCP_REQUEST);
+    if (client.connected()) {  // TODO check remote IP and port?
+      if (localConfig.enableRtuOverTcp) client.write(PDU, pduLength);
+      else {
+        client.write(MBAP, 6);
+        client.write(PDU, pduLength - 2);  //send without CRC
+      }
+#ifdef ENABLE_EXTRA_DIAG
+      ethTxCount += pduLength;
+      if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+#endif /* ENABLE_EXTRA_DIAG */
+    }  // TODO TCP Connection Error
+  }    // else SCAN_REQUEST (no ethTxCount, but yes delete request)
+  deleteRequest();
 }
 
 bool checkCRC(byte buf[], int len) {

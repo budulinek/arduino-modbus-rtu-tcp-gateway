@@ -7,6 +7,10 @@ Allows you to connect your Modbus RTU slaves (such as sensors, energy meters, HV
 
 Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via web interface (settings are automatically stored in EEPROM).
 
+<img src="/pics/modbus4.png" alt="04" style="zoom:100%;" />
+
+<img src="/pics/modbus5.png" alt="05" style="zoom:100%;" />
+
 ## What are the technical specifications?
 
 * slaves are connected via RS485 interface
@@ -68,8 +72,6 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **DNS**. Only if ENABLE_DHCP.
 
-<img src="/pics/modbus4.png" alt="04" style="zoom:100%;" />
-
 ### TCP/UDP Settings:
 
 **Modbus TCP Port**.
@@ -79,8 +81,6 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 **Web Port**.
 
 **Modbus Mode**. Modbus TCP/UDP or Modbus RTU over TCP/UDP.
-
-<img src="/pics/modbus5.png" alt="05" style="zoom:100%;" />
 
 ### RS485 Settings:
 

@@ -42,7 +42,7 @@ void startSerial() {
 #endif                                             /* RS485_CONTROL_PIN */
 }
 
-// time to send 1 character over serial in microseconds (never above 40 000 so we can use unsigned int)
+// time to send 1 character over serial in microseconds
 unsigned long charTime() {
   byte bits =                                                   // number of bits per character (11 in default Modbus RTU settings)
     1 +                                                         // start bit
@@ -52,20 +52,21 @@ unsigned long charTime() {
   return (bits * 1000000UL) / (unsigned long)localConfig.baud;
 }
 
+// character timeout
 unsigned long charTimeOut() {
-  if (localConfig.baud <= 19200) {
+  if (localConfig.baud <= 19200UL) {
     return 1.5 * charTime();  // inter-character time-out should be 1,5T
   } else {
     return 750;
   }
 }
 
+// minimum frame delay
 unsigned long frameDelay() {
-  if (FRAME_DELAY) return FRAME_DELAY * 1000UL;
-  if (localConfig.baud <= 19200) {
+  if (localConfig.baud <= 19200UL) {
     return 3.5 * charTime();  // inter-frame delay should be 3,5T
   } else {
-    return 1750;
+    return 1750;  // 1750 μs
   }
 }
 
@@ -81,15 +82,14 @@ void startEthernet() {
   memcpy(mac, MAC_START, 3);               // set first 3 bytes
   memcpy(mac + 3, localConfig.macEnd, 3);  // set last 3 bytes
 #ifdef ENABLE_DHCP
-  if (localConfig.enableDhcp) {
+  if (extraConfig.enableDhcp) {
     dhcpSuccess = Ethernet.begin(mac);
   }
-  if (!localConfig.enableDhcp || dhcpSuccess == false) {
-    Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+  if (!extraConfig.enableDhcp || dhcpSuccess == false) {
+    Ethernet.begin(mac, localConfig.ip, extraConfig.dns, localConfig.gateway, localConfig.subnet);
   }
 #else  /* ENABLE_DHCP */
-//   Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
-  Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);
+  Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);  // No DNS
 #endif /* ENABLE_DHCP */
   modbusServer = EthernetServer(localConfig.tcpPort);
   webServer = EthernetServer(localConfig.webPort);
@@ -105,7 +105,7 @@ void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
-  if (localConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
+  if (extraConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
     uint8_t maintainResult = Ethernet.maintain();
     if (maintainResult == 1 || maintainResult == 3) {  // renew failed or rebind failed
       dhcpSuccess = false;
@@ -115,7 +115,6 @@ void maintainDhcp() {
 }
 #endif /* ENABLE_DHCP */
 
-#ifdef ENABLE_EXTRA_DIAG
 void maintainUptime() {
   unsigned long milliseconds = millis();
   if (last_milliseconds > milliseconds) {
@@ -129,21 +128,39 @@ void maintainUptime() {
   //We add the "remaining_seconds", so that we can continue measuring the time passed from the last boot of the device.
   seconds = (milliseconds / 1000) + remaining_seconds;
 }
-#endif /* ENABLE_EXTRA_DIAG */
 
-#ifdef ENABLE_EXTRA_DIAG
-void maintainCounters() {
-  // synchronize roll-over of data counters to zero, at 0xFFFFFF00 or 0xFF00 respectively
+bool rollover() {
+  // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const unsigned long ROLLOVER = 0xFFFFFF00;
-  if (serialTxCount > ROLLOVER || serialRxCount > ROLLOVER || ethTxCount > ROLLOVER || ethRxCount > ROLLOVER) {
-    ethRxCount = 0;
-    ethTxCount = 0;
-    serialRxCount = 0;
-    serialTxCount = 0;
+  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // there is no counter for STAT_ERROR_0B_QUEUE
+    if (errorCount[i] > ROLLOVER) {
+      return true;
+    }
   }
-}
+  if (errorTcpCount > ROLLOVER || errorRtuCount > ROLLOVER || errorTimeoutCount > ROLLOVER || seconds > ROLLOVER) {
+    return true;
+  }
+#ifdef ENABLE_EXTRA_DIAG
+  if (serialTxCount > ROLLOVER || serialRxCount > ROLLOVER || ethTxCount > ROLLOVER || ethRxCount > ROLLOVER) {
+    return true;
+  }
 #endif /* ENABLE_EXTRA_DIAG */
+  return false;
+}
 
+void resetStats() {
+  memset(errorCount, 0, sizeof(errorCount));
+  errorTcpCount = 0;
+  errorRtuCount = 0;
+  errorTimeoutCount = 0;
+  remaining_seconds = -(millis() / 1000);
+#ifdef ENABLE_EXTRA_DIAG
+  ethRxCount = 0;
+  ethTxCount = 0;
+  serialRxCount = 0;
+  serialTxCount = 0;
+#endif /* ENABLE_EXTRA_DIAG */
+}
 
 void generateMac() {
   // Marsaglia algorithm from https://github.com/RobTillaart/randomHelpers

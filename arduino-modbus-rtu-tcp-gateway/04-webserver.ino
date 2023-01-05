@@ -20,15 +20,15 @@ const byte WEB_IN_BUFFER_SIZE = 128;  // size of web server read buffer (reads a
 const byte SMALL_BUFFER_SIZE = 32;    // a smaller buffer for uri
 
 // Actions that need to be taken after saving configuration.
-// These actions are also used by buttons on the Tools page.
 enum action_type : byte {
   NONE,
-  FACTORY,      // Restore factory settings (but keep MAC address)
+  FACTORY,      // Load default factory settings (but keep MAC address)
   MAC,          // Generate new random MAC
   REBOOT,       // Reboot the microcontroller
   ETH_SOFT,     // Ethernet software reset
   SERIAL_SOFT,  // Serial software reset
   SCAN,         // Initialize RS485 scan
+  RST_STATS,         // Reset Modbus Statistics
   WEB           // Restart webserver
 };
 enum action_type action;
@@ -38,11 +38,11 @@ enum action_type action;
 // The following enum array can have a maximum of 10 elements (incl. PAGE_NONE and PAGE_WAIT)
 enum page : byte {
   PAGE_NONE,  // reserved for NULL
+  PAGE_INFO,
   PAGE_STATUS,
   PAGE_IP,
   PAGE_TCP,
   PAGE_RTU,
-  PAGE_TOOLS,
   PAGE_WAIT  // page with "Reloading. Please wait..." message. Must be the last element within this enum!!
 };
 
@@ -76,6 +76,7 @@ enum post_key : byte {
   POST_DATA,        // data bits
   POST_PARITY,      // parity
   POST_STOP,        // stop bits
+  POST_FRAMEDELAY,  //frame delay
   POST_TIMEOUT,     // response timeout
   POST_ATTEMPTS,    // number of request attempts
   POST_ACTION       // actions on Tools page
@@ -133,8 +134,8 @@ void recvWeb() {
 
     // Get number of the requested page from URI
     byte reqPage = 0;       //requested page
-    if (!strcmp(uri, "/"))  // the homepage Current Status
-      reqPage = PAGE_STATUS;
+    if (!strcmp(uri, "/"))  // the homepage System Info
+      reqPage = PAGE_INFO;
     else if ((uri[0] == '/') && !strcmp(uri + 2, ".htm")) {
       reqPage = (byte)(uri[1] - 48);  // Convert single ASCII char to byte
     }
@@ -155,11 +156,13 @@ void recvWeb() {
     if (reqPage == PAGE_WAIT) {
       for (byte n = 0; n < maxSockNum; n++) {
         // in case of webserver restart, stop only clients from old webserver (clients with port different from current settings)
-        EthernetClient clientTemp = EthernetClient(n);
+        // EthernetClient clientTemp = EthernetClient(n);
+        unsigned int port = W5100.readSnPORT(n);
         // for WEB, stop only clients from old webserver (those that do not match modbus ports or current web port); for other actions stop all clients
-        if (action != WEB || (clientTemp.localPort() && clientTemp.localPort() != localConfig.webPort && clientTemp.localPort() != localConfig.udpPort && clientTemp.localPort() != localConfig.tcpPort)) {
-          clientTemp.flush();
-          clientTemp.stop();
+        if (action != WEB || (port && port != localConfig.webPort && port != localConfig.udpPort && port != localConfig.tcpPort)) {
+          W5100.execCmdSn(n, Sock_CLOSE);  // close it forcefully
+                                           // clientTemp.flush();
+                                           //       clientTemp.stop();
         }
       }
       switch (action) {
@@ -169,7 +172,6 @@ void recvWeb() {
         case REBOOT:
           Serial.flush();
           Serial.end();
-          delay(1);
           resetFunc();
           break;
         default:  // ETH_SOFT, FACTORY, MAC
@@ -183,7 +185,7 @@ void recvWeb() {
 }
 
 // This function stores POST parameter values in localConfig.
-// Most changes are saved and applied immediatelly, some changes (IP settings, web server port, actions in "Tools" page) are saved but applied later after "please wait" page is sent.
+// Most changes are saved and applied immediatelly, some changes (IP settings, web server port, reboot) are saved but applied later after "please wait" page is sent.
 void processPost(char postParameter[]) {
   char *point = NULL;
   char *sav1 = NULL;  // for outer strtok_r
@@ -204,38 +206,35 @@ void processPost(char postParameter[]) {
         break;
 #ifdef ENABLE_DHCP
       case POST_DHCP:
-        if ((byte)paramValueUlong != localConfig.enableDhcp) {
-          action = ETH_SOFT;
-          localConfig.enableDhcp = (byte)paramValueUlong;
+        {
+          extraConfig.enableDhcp = (byte)paramValueUlong;
+        }
+        break;
+      case POST_DNS ... POST_DNS_3:
+        {
+          extraConfig.dns[paramKeyByte - POST_DNS] = (byte)paramValueUlong;
         }
         break;
 #endif /* ENABLE_DHCP */
       case POST_IP ... POST_IP_3:
-        if ((byte)paramValueUlong != localConfig.ip[paramKeyByte - POST_IP]) {
-          action = ETH_SOFT;
+        {
+          action = ETH_SOFT; // this ETH_SOFT is triggered when the user changes anything on the "IP Settings" page.
+          // No need to trigger ETH_SOFT for other cases (POST_SUBNET, POST_GATEWAY etc.)
           localConfig.ip[paramKeyByte - POST_IP] = (byte)paramValueUlong;
         }
         break;
       case POST_SUBNET ... POST_SUBNET_3:
-        if ((byte)paramValueUlong != localConfig.subnet[paramKeyByte - POST_SUBNET]) {
-          action = ETH_SOFT;
+        {
           localConfig.subnet[paramKeyByte - POST_SUBNET] = (byte)paramValueUlong;
         }
         break;
       case POST_GATEWAY ... POST_GATEWAY_3:
-        if ((byte)paramValueUlong != localConfig.gateway[paramKeyByte - POST_GATEWAY]) {
-          action = ETH_SOFT;
+        {
           localConfig.gateway[paramKeyByte - POST_GATEWAY] = (byte)paramValueUlong;
         }
         break;
-      case POST_DNS ... POST_DNS_3:
-        if ((byte)paramValueUlong != localConfig.dns[paramKeyByte - POST_DNS]) {
-          action = ETH_SOFT;
-          localConfig.dns[paramKeyByte - POST_DNS] = (byte)paramValueUlong;
-        }
-        break;
       case POST_TCP:
-        if (localConfig.tcpPort != (unsigned int)paramValueUlong) {
+        {
           for (byte i = 0; i < maxSockNum; i++) {
             EthernetClient clientTemp = EthernetClient(i);
             if (clientTemp.status() != SnSR::UDP && clientTemp.localPort() == localConfig.tcpPort) {
@@ -248,44 +247,51 @@ void processPost(char postParameter[]) {
         }
         break;
       case POST_UDP:
-        if (localConfig.udpPort != (unsigned int)paramValueUlong) {
+        {
           localConfig.udpPort = (unsigned int)paramValueUlong;
           Udp.stop();
           Udp.begin(localConfig.udpPort);
         }
         break;
       case POST_WEB:
-        if (localConfig.webPort != (unsigned int)paramValueUlong) {
-          localConfig.webPort = (unsigned int)paramValueUlong;
-          action = WEB;
+        {
+          if (localConfig.webPort != (unsigned int)paramValueUlong) {
+            localConfig.webPort = (unsigned int)paramValueUlong;
+            action = WEB;
+          }
         }
         break;
       case POST_RTU_OVER:
         localConfig.enableRtuOverTcp = (byte)paramValueUlong;
         break;
       case POST_BAUD:
-        if (localConfig.baud != paramValueUlong) {
-          action = SERIAL_SOFT;
+        {
+          action = SERIAL_SOFT; // this SERIAL_SOFT is triggered when the user changes anything on the "RS485 Settings" page.
+          // No need to trigger ETH_SOFT for other cases (POST_DATA, POST_PARITY etc.)
           localConfig.baud = paramValueUlong;
+          byte minFrameDelay = (byte)(frameDelay() / 1000UL) + 1;
+          if (localConfig.frameDelay < minFrameDelay) {
+            localConfig.frameDelay = minFrameDelay;
+          }
         }
         break;
       case POST_DATA:
-        if ((((localConfig.serialConfig & 0x06) >> 1) + 5) != (byte)paramValueUlong) {
-          action = SERIAL_SOFT;
+        {
           localConfig.serialConfig = (localConfig.serialConfig & 0xF9) | (((byte)paramValueUlong - 5) << 1);
         }
         break;
       case POST_PARITY:
-        if (((localConfig.serialConfig & 0x30) >> 4) != (byte)paramValueUlong) {
-          action = SERIAL_SOFT;
+        {
           localConfig.serialConfig = (localConfig.serialConfig & 0xCF) | ((byte)paramValueUlong << 4);
         }
         break;
       case POST_STOP:
-        if ((((localConfig.serialConfig & 0x08) >> 3) + 1) != (byte)paramValueUlong) {
-          action = SERIAL_SOFT;
+        {
           localConfig.serialConfig = (localConfig.serialConfig & 0xF7) | (((byte)paramValueUlong - 1) << 3);
         }
+        break;
+      case POST_FRAMEDELAY:
+        localConfig.frameDelay = (byte)paramValueUlong;
         break;
       case POST_TIMEOUT:
         localConfig.serialTimeout = paramValueUlong;
@@ -312,19 +318,12 @@ void processPost(char postParameter[]) {
     case MAC:
       generateMac();
       break;
+    case RST_STATS:
+      resetStats();
+      break;
     case SCAN:
       scanCounter = 1;
       memset(&stat, 0, sizeof(stat));  // clear all status flags
-      memset(errorCount, 0, sizeof(errorCount));
-      errorTcpCount = 0;
-      errorRtuCount = 0;
-      errorTimeoutCount = 0;
-#ifdef ENABLE_EXTRA_DIAG
-      ethRxCount = 0;
-      ethTxCount = 0;
-      serialRxCount = 0;
-      serialTxCount = 0;
-#endif /* ENABLE_EXTRA_DIAG */
       break;
     default:
       break;
@@ -334,7 +333,7 @@ void processPost(char postParameter[]) {
   if (action == SERIAL_SOFT) {                // can do it without "please wait" page
     Serial.flush();
     Serial.end();
-    startSerial();
+    startSerial(); // TODO clear queue?
     action = NONE;
   }
 }

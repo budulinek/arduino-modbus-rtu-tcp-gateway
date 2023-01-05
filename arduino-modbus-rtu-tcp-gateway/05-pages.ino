@@ -9,7 +9,7 @@
    menuItem
    - returns menu item string depending on the the number (i.e. URL) of the requested web page
 
-   contentStatus, contentIp, contentTcp, contentRtu, contentTools
+   contentInfo, contentStatus, contentIp, contentTcp, contentRtu
    - render the content of the requested page
 
    contentWait
@@ -40,9 +40,12 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<head>"
                   "<meta"));
   if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
-  if (reqPage == PAGE_WAIT) {  // redirect to new IP and web port
+#ifdef EXTRA_DIAG
+  if (reqPage == PAGE_INFO) chunked.print(F(" http-equiv=refresh content=5"));  // Socket stats are displayed on System Info page if EXTRA_DIAG enabled
+#endif                                                                          /* EXTRA_DIAG */
+  if (reqPage == PAGE_WAIT) {                                                   // redirect to new IP and web port
     chunked.print(F(";url=http://"));
-    chunked.print((IPAddress)localConfig.ip);
+    chunked.print(IPAddress(localConfig.ip));
     chunked.print(F(":"));
     chunked.print(localConfig.webPort);
   }
@@ -67,7 +70,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<table>"
                   "<tr><th colspan=2>"
                   "<h1>Modbus RTU &rArr; Modbus TCP/UDP Gateway</h1>"  // first row is header
-                  "<tr>"                                    // second row is left menu (first cell) and main page (second cell)
+                  "<tr>"                                               // second row is left menu (first cell) and main page (second cell)
                   "<th style=width:20%;padding:0>"
 
                   // Left Menu
@@ -83,14 +86,12 @@ void sendPage(EthernetClient &client, byte reqPage) {
     menuItem(chunked, i);
     chunked.print(F("</a>"));
   }
-  chunked.print(F("<tr></table><td id=x>"));
-
-  // Main Page
-  chunked.print(F("<form action=/"));
+  chunked.print(F("<tr></table><td id=x>"
+                  "<form action=/"));  // Main Page
   chunked.print(reqPage);
   chunked.print(F(".htm method=post>"
                   "<table style=border-collapse:collapse>"
-                  "<tr><th><th>"));
+                  "<tr><th><th colspan=2>"));
   menuItem(chunked, reqPage);
   chunked.print(F("<tr><td><br>"));
 
@@ -99,6 +100,9 @@ void sendPage(EthernetClient &client, byte reqPage) {
 
   switch (reqPage) {
     case PAGE_NONE:
+      break;
+    case PAGE_INFO:
+      contentInfo(chunked);
       break;
     case PAGE_STATUS:
       contentStatus(chunked);
@@ -111,9 +115,6 @@ void sendPage(EthernetClient &client, byte reqPage) {
       break;
     case PAGE_RTU:
       contentRtu(chunked);
-      break;
-    case PAGE_TOOLS:
-      contentTools(chunked);
       break;
     case PAGE_WAIT:
       contentWait(chunked);
@@ -134,8 +135,11 @@ void menuItem(ChunkedPrint &chunked, byte item) {
   switch (item) {
     case PAGE_NONE:
       break;
+    case PAGE_INFO:
+      chunked.print(F("System Info"));
+      break;
     case PAGE_STATUS:
-      chunked.print(F("Current Status"));
+      chunked.print(F("Modbus Status"));
       break;
     case PAGE_IP:
       chunked.print(F("IP Settings"));
@@ -146,54 +150,62 @@ void menuItem(ChunkedPrint &chunked, byte item) {
     case PAGE_RTU:
       chunked.print(F("RS485 Settings"));
       break;
-    case PAGE_TOOLS:
-      chunked.print(F("Tools"));
-      break;
     default:
       break;
   }
 }
 
-//        Current Status
-void contentStatus(ChunkedPrint &chunked) {
-  chunked.print(F("<tr><td>SW Version:<td>"));
-  chunked.print(VERSION[0], HEX);
+//        System Info
+void contentInfo(ChunkedPrint &chunked) {
+  chunked.print(F("<tr><td>SW Version:<td style=width:1%>"));
+  chunked.print(VERSION[0]);
   chunked.print(F("."));
-  chunked.print(VERSION[1], HEX);
-  chunked.print(F("<tr><td>Microcontroller:<td>"));
+  chunked.print(VERSION[1]);
+  chunked.print(F("<td><button name="));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(FACTORY);
+  chunked.print(F(">Load Default Settings</button>"  //  chunked.print(IPAddress(DEFAULT_CONFIG.ip));
+                  "<tr><td>Microcontroller:<td>"));
   chunked.print(BOARD);
-  // chunked.print(freeMemory());
-//  chunked.print(serialState, HEX);
-
-  chunked.print(F("<tr><td>Ethernet Chip:<td>"));
+  chunked.print(F("<td><button name="));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(REBOOT);
+  chunked.print(F(">Reboot</button>"
+                  "<tr><td>Ethernet Chip:<td>"));
   switch (Ethernet.hardwareStatus()) {
     case EthernetW5100:
-      chunked.print(F("W5100"));
+      chunked.print(F("W5100 (4"));
       break;
     case EthernetW5200:
-      chunked.print(F("W5200"));
+      chunked.print(F("W5200 (8"));
       break;
     case EthernetW5500:
-      chunked.print(F("W5500"));
+      chunked.print(F("W5500 (8"));
       break;
     default:  // TODO: add W6100 once it is included in Ethernet library
-      chunked.print(F("Unknown"));
+      chunked.print(F("Unknown (8"));
       break;
   }
-  chunked.print(F("<tr><td>Ethernet Sockets:<td>"));
-  chunked.print(maxSockNum, HEX);
-  chunked.print(F("<tr><td>MAC Address:<td>"));
+  chunked.print(F(" sockets)<tr><td>MAC Address:<td>"));
   byte macBuffer[6];
-  Ethernet.MACAddress(macBuffer);
+  W5100.getMACAddress(macBuffer);
+  //  Ethernet.MACAddress(macBuffer);
   for (byte i = 0; i < 6; i++) {
     if (macBuffer[i] < 16) chunked.print(F("0"));
     chunked.print(macBuffer[i], HEX);
     if (i < 5) chunked.print(F(":"));
   }
+  chunked.print(F("<td><button name="));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(MAC);
+  chunked.print(F(">Generate New MAC</button>"));
 
 #ifdef ENABLE_DHCP
   chunked.print(F("<tr><td>Auto IP:<td>"));
-  if (!localConfig.enableDhcp) {
+  if (!extraConfig.enableDhcp) {
     chunked.print(F("DHCP disabled"));
   } else if (dhcpSuccess == true) {
     chunked.print(F("DHCP successful"));
@@ -203,22 +215,11 @@ void contentStatus(ChunkedPrint &chunked) {
 #endif /* ENABLE_DHCP */
 
   chunked.print(F("<tr><td>IP Address:<td>"));
-  chunked.print(Ethernet.localIP());
+  byte tempIP[4];
+  W5100.getIPAddress(tempIP);
+  chunked.print(IPAddress(tempIP));
 
 #ifdef ENABLE_EXTRA_DIAG
-  chunked.print(F("<tr><td>Run Time:<td>"));
-  byte mod_seconds = byte((seconds) % 60);
-  byte mod_minutes = byte((seconds / 60) % 60);
-  byte mod_hours = byte((seconds / (60 * 60)) % 24);
-  int days = (seconds / (60U * 60U * 24));
-  chunked.print(days);
-  chunked.print(F(" days, "));
-  chunked.print(mod_hours);
-  chunked.print(F(" hours, "));
-  chunked.print(mod_minutes);
-  chunked.print(F(" mins, "));
-  chunked.print(mod_seconds);
-  chunked.print(F(" secs"));
   chunked.print(F("<tr><td>RS485 Data:<td>"));
   chunked.print(serialTxCount);
   chunked.print(F(" Tx bytes / "));
@@ -233,7 +234,6 @@ void contentStatus(ChunkedPrint &chunked) {
                   "<table style=border-collapse:collapse;text-align:center>"
                   "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
   for (byte i = 0; i < maxSockNum; i++) {
-    EthernetClient clientDiag = EthernetClient(i);
     chunked.print(F("<tr><td>Socket "));
     chunked.print(i);
     chunked.print(F(":<td>"));
@@ -266,7 +266,7 @@ void contentStatus(ChunkedPrint &chunked) {
         break;
     }
     chunked.print(F("<td>"));
-    switch (clientDiag.status()) {
+    switch (W5100.readSnSR(i)) {
       case SnSR::CLOSED:
         chunked.print(F("CLOSED"));
         break;
@@ -316,28 +316,40 @@ void contentStatus(ChunkedPrint &chunked) {
         break;
     }
     chunked.print(F("<td>"));
-    chunked.print(clientDiag.localPort());
+    chunked.print(W5100.readSnPORT(i));
     chunked.print(F("<td>"));
-    chunked.print(clientDiag.remoteIP());
+    uint8_t tempIP[4];
+    W5100.readSnDIPR(i, tempIP);
+    chunked.print(IPAddress(tempIP));
     chunked.print(F("<td>"));
-    chunked.print(clientDiag.remotePort());
+    chunked.print(W5100.readSnDPORT(i));
   }
   chunked.print(F("</table>"));
 #endif /* ENABLE_EXTRA_DIAG */
+}
 
-  chunked.print(F("<tr><td>Requests Queue:<td>"));
-  chunked.print(queueDataSize);
-  chunked.print(F(" / "));
-  chunked.print(MAX_QUEUE_DATA);
-  chunked.print(F(" bytes"
+//        Modbus Status
+void contentStatus(ChunkedPrint &chunked) {
+  chunked.print(F("<tr><td>Run Time:<td>"));
+  //  byte mod_seconds = byte((seconds) % 60);
+  //  byte mod_minutes = byte((seconds / 60) % 60);
+  //  unsigned long mod_hours = (seconds / (60UL * 60UL)) % 24UL;
+  //  int days = ();
+  chunked.print(seconds / (3600UL * 24L));
+  chunked.print(F(" days, "));
+  //  chunked.print(byte((seconds% (3600UL * 24L)) / 3600UL));
+  chunked.print(byte((seconds / 3600UL) % 24L));
+  chunked.print(F(" hours, "));
+  chunked.print(byte((seconds / 60UL) % 60L));
+  chunked.print(F(" mins, "));
+  chunked.print(byte((seconds) % 60L));
+  chunked.print(F(" secs"
+                  "<tr><td>Modbus Statistics:<td><button name="));
+  chunked.print(POST_ACTION);
+  chunked.print(F(" value="));
+  chunked.print(RST_STATS);
+  chunked.print(F(">Reset Stats</button>"
                   "<tr><td><td>"));
-  chunked.print(queueHeadersSize);
-  chunked.print(F(" / "));
-  chunked.print(MAX_QUEUE_REQUESTS);
-  chunked.print(F(" requests"));
-  queueDataSize = queueData.size();
-  queueHeadersSize = queueHeaders.size();
-  chunked.print(F("<tr><td>Modbus Stats:<td>"));
   for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // there is no counter for STAT_ERROR_0B_QUEUE
     chunked.print(errorCount[i]);
     helperStats(chunked, i);
@@ -351,34 +363,46 @@ void contentStatus(ChunkedPrint &chunked) {
                   "<tr><td><td>"));
   chunked.print(errorTimeoutCount);
   chunked.print(F(" Response Timeout"
-                  "<tr><td>Modbus TCP/UDP Masters:"));
-  byte countMasters = 0;
+                  "<tr><td>Requests Queue:<td>"));
+  chunked.print(queueDataSize);
+  chunked.print(F(" / "));
+  chunked.print(MAX_QUEUE_DATA);
+  chunked.print(F(" bytes"
+                  "<tr><td><td>"));
+  chunked.print(queueHeadersSize);
+  chunked.print(F(" / "));
+  chunked.print(MAX_QUEUE_REQUESTS);
+  chunked.print(F(" requests"));
+  queueDataSize = queueData.size();
+  queueHeadersSize = queueHeaders.size();
+  chunked.print(F("<tr><td>Modbus TCP/UDP Masters:"));
+  bool masters = false;
   for (byte i = 0; i < maxSockNum; i++) {
-    EthernetClient clientDiag = EthernetClient(i);
-    IPAddress ipTemp = clientDiag.remoteIP();
-    if (ipTemp != 0 && ipTemp != 0xFFFFFFFF) {
-      if (clientDiag.status() == SnSR::UDP && clientDiag.localPort() == localConfig.udpPort) {
+    byte tempIP[4];
+    W5100.readSnDIPR(i, tempIP);
+    if (tempIP[0]) {
+      if (W5100.readSnSR(i) == SnSR::UDP) {
         chunked.print(F("<td><tr><td>UDP:<td>"));
-        chunked.print((IPAddress)ipTemp);
-        countMasters++;
-      } else if (clientDiag.localPort() == localConfig.tcpPort) {
+      } else if (W5100.readSnPORT(i) == localConfig.tcpPort) {
         chunked.print(F("<td><tr><td>TCP:<td>"));
-        chunked.print((IPAddress)ipTemp);
-        countMasters++;
+      } else {
+        continue;
       }
+      chunked.print(IPAddress(tempIP));
+      masters = true;
     }
   }
-  if (countMasters == 0) chunked.print(F("<td>None"));
+  if (masters == false) chunked.print(F("<td>None"));
   chunked.print(F("<tr><td>Modbus RTU Slaves:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(SCAN);
-  chunked.print(F(">Scan Slaves & Reset Stats</button>"));
-  byte countSlaves = 0;
+  chunked.print(F(">Scan Slaves</button>"));
+  bool slaves = false;
   for (int k = 1; k < MAX_SLAVES; k++) {
     for (int s = 0; s < STAT_NUM; s++) {
       if (getSlaveStatus(k, s) == true || k == scanCounter) {
-        countSlaves++;
+        slaves = true;
         chunked.print(F("<tr><td><td>0x"));
         if (k < 16) chunked.print(F("0"));
         chunked.print(k, HEX);
@@ -390,9 +414,8 @@ void contentStatus(ChunkedPrint &chunked) {
       }
     }
   }
-  if (countSlaves == 0 && scanCounter == 0) chunked.print(F("<tr><td><td>None"));
+  if (slaves == false && scanCounter == 0) chunked.print(F("<tr><td><td>None"));
 }
-
 
 //            IP Settings
 void contentIp(ChunkedPrint &chunked) {
@@ -404,10 +427,10 @@ void contentIp(ChunkedPrint &chunked) {
                   "<input type=checkbox id=box name="));
   chunked.print(POST_DHCP);
   chunked.print(F(" onclick=dis(this.checked) value=1"));
-  if (localConfig.enableDhcp) chunked.print(F(" checked"));
+  if (extraConfig.enableDhcp) chunked.print(F(" checked"));
   chunked.print(F(">Enable DHCP"));
 #endif /* ENABLE_DHCP */
-  for (byte j = 0; j < 4; j++) {
+  for (byte j = 0; j < 3; j++) {
     chunked.print(F("<tr><td>"));
     switch (j) {
       case 0:
@@ -418,9 +441,6 @@ void contentIp(ChunkedPrint &chunked) {
         break;
       case 2:
         chunked.print(F("Gateway"));
-        break;
-      case 3:
-        chunked.print(F("DNS Server"));
         break;
       default:
         break;
@@ -440,9 +460,6 @@ void contentIp(ChunkedPrint &chunked) {
         case 2:
           chunked.print(localConfig.gateway[i]);
           break;
-        case 3:
-          chunked.print(localConfig.dns[i]);
-          break;
         default:
           break;
       }
@@ -450,6 +467,19 @@ void contentIp(ChunkedPrint &chunked) {
       if (i < 3) chunked.print(F("."));
     }
   }
+#ifdef ENABLE_DHCP
+  chunked.print(F("<tr><td>"));
+  chunked.print(F("DNS Server"));
+  chunked.print(F(":<td>"));
+  for (byte i = 0; i < 4; i++) {
+    chunked.print(F("<input name="));
+    chunked.print(POST_DNS + i);
+    chunked.print(F(" type=tel class=ip required maxlength=3 size=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
+    chunked.print(extraConfig.dns[i]);
+    chunked.print(F(">"));
+    if (i < 3) chunked.print(F("."));
+  }
+#endif /* ENABLE_DHCP */
 }
 
 //            TCP/UDP Settings
@@ -464,7 +494,7 @@ void contentTcp(ChunkedPrint &chunked) {
         chunked.print(F("Modbus UDP"));
         break;
       case 2:
-        chunked.print(F("Web"));
+        chunked.print(F("Web UI"));
         break;
       default:
         break;
@@ -569,9 +599,17 @@ void contentRtu(ChunkedPrint &chunked) {
     chunked.print(F("</option>"));
   }
   chunked.print(F("</select> bit"
-  //                   "<tr><td>Frame Delay:"));
-  // chunked.print(frameDelay());
-  // chunked.print(F(" μs"
+                  "<tr><td>Frame Delay:"));
+  helperInput(chunked);
+  chunked.print(POST_FRAMEDELAY);
+  chunked.print(F(" min="));
+  byte minFrameDelay = (byte)(frameDelay() / 1000UL) + 1;
+  chunked.print(minFrameDelay);
+  chunked.print(F(" max=250 value="));
+  chunked.print(localConfig.frameDelay);
+  chunked.print(F("> ("));
+  chunked.print(minFrameDelay);
+  chunked.print(F("~250) ms"
                   "<tr><td>Response Timeout:"));
   helperInput(chunked);
   chunked.print(POST_TIMEOUT);
@@ -586,26 +624,6 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("> (1~5)"));
 }
 
-//        Tools
-void contentTools(ChunkedPrint &chunked) {
-  chunked.print(F("<tr><td>Factory Defaults:<td><button name="));
-  chunked.print(POST_ACTION);
-  chunked.print(F(" value="));
-  chunked.print(FACTORY);
-  chunked.print(F(">Restore</button> (Static IP: "));
-  chunked.print((IPAddress)DEFAULT_CONFIG.ip);
-  chunked.print(F(")"
-                  "<tr><td>MAC Address: <td><button name="));
-  chunked.print(POST_ACTION);
-  chunked.print(F(" value="));
-  chunked.print(MAC);
-  chunked.print(F(">Generate New</button>"
-                  "<tr><td>Microcontroller: <td><button name="));
-  chunked.print(POST_ACTION);
-  chunked.print(F(" value="));
-  chunked.print(REBOOT);
-  chunked.print(F(">Reboot</button>"));
-}
 
 void contentWait(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td><td><br>Reloading. Please wait..."));

@@ -31,15 +31,6 @@
 #define UDP_REQUEST B00100000       // UDP request
 #define TCP_REQUEST B00001111       // TCP request, also stores TCP client number
 
-enum status : byte {
-  STAT_OK,              // Slave Responded
-  STAT_ERROR_0X,        // Slave Responded with Error (Codes 1~8)
-  STAT_ERROR_0A,        // Gateway Overloaded (Code 10)
-  STAT_ERROR_0B,        // Slave Failed to Respond (Code 11)
-  STAT_ERROR_0B_QUEUE,  // Slave Failed to Respond (Code 11) + in Queue
-  STAT_NUM              // Number of status flags in this enum. Must be the last element within this enum!!
-};
-
 // bool arrays for storing Modbus RTU status of individual slaves
 uint8_t stat[STAT_NUM][(MAX_SLAVES + 1 + 7) / 8];
 
@@ -47,15 +38,6 @@ uint8_t stat[STAT_NUM][(MAX_SLAVES + 1 + 7) / 8];
 bool scanReqInQueue = false;
 // Counter for priority requests in the queue
 byte priorityReqInQueue;
-
-// array for storing error counts
-uint16_t errorCount[STAT_ERROR_0B_QUEUE]; // there is no counter for STAT_ERROR_0B_QUEUE
-uint16_t errorTcpCount;
-uint16_t errorRtuCount;
-uint16_t errorTimeoutCount;
-
-uint16_t queueDataSize;
-uint8_t queueHeadersSize;
 
 uint8_t masks[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
@@ -71,6 +53,8 @@ typedef struct {
 // each request is stored in 3 queues (all queues are written to, read and deleted in sync)
 CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
 CircularBuffer<byte, MAX_QUEUE_DATA> queueData;           // queue of PDU data
+
+byte addressPos;
 
 void recvUdp() {
   unsigned int msgLength = Udp.parsePacket();
