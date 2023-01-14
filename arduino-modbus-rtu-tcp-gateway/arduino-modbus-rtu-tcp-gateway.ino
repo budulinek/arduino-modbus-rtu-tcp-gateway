@@ -39,15 +39,15 @@
   v3.2 2022-06-04 Reduce program size (so that it fits on Nano), ethernet data counter only available when ENABLE_EXTRA_DIAG.
   v4.0 2023-01-05 Modbus statistics and error reporting on "Modbus Status" page, add Frame Delay setting for Modbus RTU
                   Optimize Modbus timeout and attempts, significant reduction of code size
+  v4.1 2023-01-14 Fetch API, bugfix MAX485
 
 */
 
-const byte VERSION[] = { 4, 0 };
+const byte VERSION[] = { 4, 1 };
 
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
-#include <utility/w5100.h>
 #include <CircularBuffer.h>  // CircularBuffer https://github.com/rlogiacco/CircularBuffer
 #include <EEPROM.h>
 #include <StreamLib.h>  // StreamLib https://github.com/jandrassy/StreamLib
@@ -69,12 +69,13 @@ const int MODBUS_SIZE = 256;                                   // size of a MODB
 const byte ETH_RESET_PIN = 7;                                  // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
 const int SCAN_TIMEOUT = 200;                                  // Timeout (ms) for scan requests
 const byte SCAN_COMMAND[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };  // Command sent during Modbus RTU Scan. Slave is detected as "Responding" if any response (even error) is received.
+const int FETCH_INTERVAL = 2000;                               // Fetch API interval for the Modbus Status webpage to renew data from JSON served by Arduino
 
 /****** EXTRA FUNCTIONS ******/
 
 // these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have a board with more memory
 // #define ENABLE_DHCP            // Enable DHCP (Auto IP settings)
-// #define ENABLE_EXTRA_DIAG      // Enable per socket diagnostics, run time counter, etc.
+// #define ENABLE_EXTRA_DIAG      // Enable Ethernet and Serial byte counter.
 
 /****** DEFAULT FACTORY SETTINGS ******/
 
@@ -139,6 +140,19 @@ const extra_config_type EXTRA_CONFIG = {
 extra_config_type extraConfig;
 #endif /* ENABLE_DHCP */
 
+typedef struct {
+  byte tid[2];           // MBAP Transaction ID
+  byte msgLen;           // lenght of Modbus message stored in queueData
+  IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
+  unsigned int remPort;  // remote port for UDP client (UDP response is sent back to remote port)
+  byte requestType;      // TCP client who sent the request
+  byte atts;             // attempts counter
+} header;
+
+// each request is stored in 3 queues (all queues are written to, read and deleted in sync)
+CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
+CircularBuffer<byte, MAX_QUEUE_DATA> queueData;           // queue of PDU data
+
 /****** ETHERNET AND SERIAL ******/
 
 #ifdef UDP_TX_PACKET_MAX_SIZE
@@ -184,6 +198,9 @@ void MicroTimer::sleep(unsigned long sleepTimeMs) {
   timestampLastHitMs = micros();
 }
 
+MicroTimer recvTimer;
+MicroTimer sendTimer;
+
 uint16_t crc;
 #define RS485_TRANSMIT HIGH
 #define RS485_RECEIVE LOW
@@ -204,6 +221,14 @@ enum status : byte {
   STAT_ERROR_0B_QUEUE,  // Slave Failed to Respond (Code 11) + in Queue
   STAT_NUM              // Number of status flags in this enum. Must be the last element within this enum!!
 };
+
+// bool arrays for storing Modbus RTU status of individual slaves
+uint8_t stat[STAT_NUM][(MAX_SLAVES + 1 + 7) / 8];
+
+// Scan request is in the queue
+bool scanReqInQueue = false;
+// Counter for priority requests in the queue
+byte priorityReqInQueue;
 
 /****** RUN TIME AND DATA COUNTERS ******/
 
@@ -280,7 +305,7 @@ void loop() {
   recvWeb();
 
   if (rollover()) resetStats();
-  
+
 #ifdef ENABLE_DHCP
   maintainDhcp();
 #endif /* ENABLE_DHCP */

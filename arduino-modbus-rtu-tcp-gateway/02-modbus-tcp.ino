@@ -31,28 +31,7 @@
 #define UDP_REQUEST B00100000       // UDP request
 #define TCP_REQUEST B00001111       // TCP request, also stores TCP client number
 
-// bool arrays for storing Modbus RTU status of individual slaves
-uint8_t stat[STAT_NUM][(MAX_SLAVES + 1 + 7) / 8];
-
-// Scan request is in the queue
-bool scanReqInQueue = false;
-// Counter for priority requests in the queue
-byte priorityReqInQueue;
-
 uint8_t masks[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
-
-typedef struct {
-  byte tid[2];           // MBAP Transaction ID
-  byte msgLen;           // lenght of Modbus message stored in queueData
-  IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
-  unsigned int remPort;  // remote port for UDP client (UDP response is sent back to remote port)
-  byte requestType;      // TCP client who sent the request
-  byte atts;             // attempts counter
-} header;
-
-// each request is stored in 3 queues (all queues are written to, read and deleted in sync)
-CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
-CircularBuffer<byte, MAX_QUEUE_DATA> queueData;           // queue of PDU data
 
 byte addressPos;
 
@@ -173,7 +152,7 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
   msgLength = msgLength - addressPos - (2 * localConfig.enableRtuOverTcp);  // in Modbus RTU over TCP/UDP do not store CRC
   // check if we have space in request queue
   if (queueHeaders.available() < 1 || queueData.available() < msgLength) {
-    setSlaveStatus(inBuffer[addressPos], STAT_ERROR_0A, true);
+    setSlaveStatus(inBuffer[addressPos], STAT_ERROR_0A, true, false);
     return 0x0A;  // return modbus error 0x0A (Gateway Overloaded)
   }
   // allow only one request to non responding slaves
@@ -181,7 +160,7 @@ byte checkRequest(const byte inBuffer[], unsigned int msgLength, const IPAddress
     errorCount[STAT_ERROR_0B]++;
     return 0x0B;  // return modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
   } else if (getSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B)) {
-    setSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B_QUEUE, true);
+    setSlaveStatus(inBuffer[addressPos], STAT_ERROR_0B_QUEUE, true, false);
   } else {
     // Add PRIORITY_REQUEST flag to requests for responding slaves
     requestType = requestType | PRIORITY_REQUEST;
@@ -224,7 +203,7 @@ bool getSlaveStatus(const uint8_t slave, const byte status) {
   return (stat[status][slave / 8] & masks[slave & 7]) > 0;
 }
 
-void setSlaveStatus(const uint8_t slave, byte status, const bool value) {
+void setSlaveStatus(const uint8_t slave, byte status, const bool value, const bool isScan) {
   if (slave >= MAX_SLAVES) return;  // error
   if (value == 0) {
     stat[status][slave / 8] &= ~masks[slave & 7];
@@ -233,6 +212,6 @@ void setSlaveStatus(const uint8_t slave, byte status, const bool value) {
       stat[i][slave / 8] &= ~masks[slave & 7];  // set all other flags to false
     }
     stat[status][slave / 8] |= masks[slave & 7];
-    if (status != STAT_ERROR_0B_QUEUE) errorCount[status]++; // there is no counter for STAT_ERROR_0B_QUEUE
+    if (status != STAT_ERROR_0B_QUEUE && isScan == false) errorCount[status]++; // there is no counter for STAT_ERROR_0B_QUEUE, ignor scans in statistics
   }
 }

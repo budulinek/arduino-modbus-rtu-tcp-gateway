@@ -19,9 +19,6 @@
 int rxNdx = 0;
 int txNdx = 0;
 
-MicroTimer recvTimer;
-MicroTimer sendTimer;
-
 void sendSerial() {
   if (!sendTimer.isOver()) {
     return;
@@ -64,9 +61,10 @@ void sendSerial() {
           // this if statement is not very reliable (too fast)
           // Serial.isFlushed() method is needed....see https://github.com/arduino/Arduino/pull/3737
           txNdx = 0;
+          mySerial.flush();
 #ifdef RS485_CONTROL_PIN
-          sendTimer.sleep(charTimeOut());  // very short delay before we toggle the RS485_CONTROL_PIN and disable RS485 transmit
-#endif                                     /* RS485_CONTROL_PIN */
+          // sendTimer.sleep(frameDelay());  // Short delay before we toggle the RS485_CONTROL_PIN and disable RS485 transmit. Not needed if we use flush()
+#endif /* RS485_CONTROL_PIN */
           serialState++;
         }
       }
@@ -95,7 +93,7 @@ void sendSerial() {
           deleteRequest();
         } else if (myHeader.atts >= localConfig.serialAttempts) {
           // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
-          setSlaveStatus(queueData[0], STAT_ERROR_0B, true);
+          setSlaveStatus(queueData[0], STAT_ERROR_0B, true, false);
           byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
           byte PDU[5] = { queueData[0], (byte)(queueData[1] + 0x80), 0x0B };
           crc = 0xFFFF;
@@ -107,7 +105,7 @@ void sendSerial() {
           sendResponse(MBAP, PDU, 5);
           errorTimeoutCount++;
         } else {
-          setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true);
+          setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true, false);
           errorTimeoutCount++;
         }                 // if (myHeader.atts >= MAX_RETRY)
         serialState = 0;  // IDLE
@@ -136,9 +134,9 @@ void recvSerial() {
     header myHeader = queueHeaders.first();
     if (checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
       if (serialIn[1] > 0x80 && (myHeader.requestType & SCAN_REQUEST) == false) {
-        setSlaveStatus(serialIn[0], STAT_ERROR_0X, true);
+        setSlaveStatus(serialIn[0], STAT_ERROR_0X, true, false);
       } else {
-        setSlaveStatus(serialIn[0], STAT_OK, true);
+        setSlaveStatus(serialIn[0], STAT_OK, true, myHeader.requestType & SCAN_REQUEST);
       }
       byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2) };
       sendResponse(MBAP, serialIn, rxNdx);

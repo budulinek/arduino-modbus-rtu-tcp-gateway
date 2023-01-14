@@ -35,6 +35,14 @@
 
 
 void startSerial() {
+  mySerial.flush();
+  mySerial.end();
+  queueHeaders.clear();            // <- eats memory!
+  queueData.clear();
+  scanReqInQueue = false;
+  priorityReqInQueue= false;
+  memset(stat[STAT_ERROR_0B_QUEUE], 0, sizeof(stat[STAT_ERROR_0B_QUEUE]));  
+  sendTimer.sleep(0);
   mySerial.begin(localConfig.baud, localConfig.serialConfig);
 #ifdef RS485_CONTROL_PIN
   pinMode(RS485_CONTROL_PIN, OUTPUT);

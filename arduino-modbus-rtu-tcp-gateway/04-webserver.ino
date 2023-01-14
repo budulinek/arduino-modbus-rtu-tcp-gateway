@@ -28,7 +28,7 @@ enum action_type : byte {
   ETH_SOFT,     // Ethernet software reset
   SERIAL_SOFT,  // Serial software reset
   SCAN,         // Initialize RS485 scan
-  RST_STATS,         // Reset Modbus Statistics
+  RST_STATS,    // Reset Modbus Statistics
   WEB           // Restart webserver
 };
 enum action_type action;
@@ -43,7 +43,7 @@ enum page : byte {
   PAGE_IP,
   PAGE_TCP,
   PAGE_RTU,
-  PAGE_WAIT  // page with "Reloading. Please wait..." message. Must be the last element within this enum!!
+  PAGE_WAIT,  // page with "Reloading. Please wait..." message.
 };
 
 // Keys for POST parameters, used in web forms and processed by processPost() function.
@@ -79,8 +79,35 @@ enum post_key : byte {
   POST_FRAMEDELAY,  //frame delay
   POST_TIMEOUT,     // response timeout
   POST_ATTEMPTS,    // number of request attempts
-  POST_ACTION       // actions on Tools page
+  POST_ACTION,      // actions on Tools page
 };
+
+// Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
+enum JSON_type : byte {
+  JSON_SECS,   // Runtime seconds
+  JSON_MINS,   // Runtime minutes
+  JSON_HOURS,  // Runtime hours
+  JSON_DAYS,   // Runtime days
+  JSON_ERROR,  // Modbus status from array errorCount[STAT_ERROR_0B_QUEUE]
+  JSON_ERROR_1,
+  JSON_ERROR_2,
+  JSON_ERROR_3,
+  JSON_ERROR_TCP,
+  JSON_ERROR_RTU,
+  JSON_ERROR_TIMEOUT,
+  JSON_QUEUE_DATA,
+  JSON_QUEUE_REQUESTS,
+  JSON_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
+  JSON_SLAVES,   // list of Modbus RTU slaves separated by <br>
+#ifdef ENABLE_EXTRA_DIAG
+  JSON_RS485_TX,
+  JSON_RS485_RX,
+  JSON_ETH_TX,
+  JSON_ETH_RX,
+#endif        /* ENABLE_EXTRA_DIAG */
+  JSON_LAST,  // Must be the very last element in this array
+};
+
 
 void recvWeb() {
   EthernetClient client = webServer.available();
@@ -139,6 +166,7 @@ void recvWeb() {
     else if ((uri[0] == '/') && !strcmp(uri + 2, ".htm")) {
       reqPage = (byte)(uri[1] - 48);  // Convert single ASCII char to byte
     }
+
     // Actions that require "please wait" page
     if (action == WEB || action == REBOOT || action == ETH_SOFT || action == FACTORY || action == MAC) {
       reqPage = PAGE_WAIT;
@@ -147,6 +175,8 @@ void recvWeb() {
     // Send page
     if ((reqPage > 0) && (reqPage <= PAGE_WAIT))
       sendPage(client, reqPage);
+    else if (!strcmp(uri, "/data.json"))
+      sendJson(client);
     else if (!strcmp(uri, "/favicon.ico"))  // a favicon
       send204(client);                      // if you don't have a favicon, send 204
     else                                    // if the page is unknown, HTTP response code 404
@@ -156,13 +186,12 @@ void recvWeb() {
     if (reqPage == PAGE_WAIT) {
       for (byte n = 0; n < maxSockNum; n++) {
         // in case of webserver restart, stop only clients from old webserver (clients with port different from current settings)
-        // EthernetClient clientTemp = EthernetClient(n);
-        unsigned int port = W5100.readSnPORT(n);
+        EthernetClient client = EthernetClient(n);
+        unsigned int port = client.localPort();
         // for WEB, stop only clients from old webserver (those that do not match modbus ports or current web port); for other actions stop all clients
         if (action != WEB || (port && port != localConfig.webPort && port != localConfig.udpPort && port != localConfig.tcpPort)) {
-          W5100.execCmdSn(n, Sock_CLOSE);  // close it forcefully
-                                           // clientTemp.flush();
-                                           //       clientTemp.stop();
+          client.flush();
+          client.stop();
         }
       }
       switch (action) {
@@ -170,8 +199,8 @@ void recvWeb() {
           webServer = EthernetServer(localConfig.webPort);
           break;
         case REBOOT:
-          Serial.flush();
-          Serial.end();
+          mySerial.flush();
+          mySerial.end();
           resetFunc();
           break;
         default:  // ETH_SOFT, FACTORY, MAC
@@ -218,7 +247,7 @@ void processPost(char postParameter[]) {
 #endif /* ENABLE_DHCP */
       case POST_IP ... POST_IP_3:
         {
-          action = ETH_SOFT; // this ETH_SOFT is triggered when the user changes anything on the "IP Settings" page.
+          action = ETH_SOFT;  // this ETH_SOFT is triggered when the user changes anything on the "IP Settings" page.
           // No need to trigger ETH_SOFT for other cases (POST_SUBNET, POST_GATEWAY etc.)
           localConfig.ip[paramKeyByte - POST_IP] = (byte)paramValueUlong;
         }
@@ -236,10 +265,10 @@ void processPost(char postParameter[]) {
       case POST_TCP:
         {
           for (byte i = 0; i < maxSockNum; i++) {
-            EthernetClient clientTemp = EthernetClient(i);
-            if (clientTemp.status() != SnSR::UDP && clientTemp.localPort() == localConfig.tcpPort) {
-              clientTemp.flush();
-              clientTemp.stop();
+            EthernetClient client = EthernetClient(i);
+            if (client.localPort() == localConfig.tcpPort) {
+              client.flush();
+              client.stop();
             }
           }
           localConfig.tcpPort = (unsigned int)paramValueUlong;
@@ -266,7 +295,7 @@ void processPost(char postParameter[]) {
         break;
       case POST_BAUD:
         {
-          action = SERIAL_SOFT; // this SERIAL_SOFT is triggered when the user changes anything on the "RS485 Settings" page.
+          action = SERIAL_SOFT;  // this SERIAL_SOFT is triggered when the user changes anything on the "RS485 Settings" page.
           // No need to trigger ETH_SOFT for other cases (POST_DATA, POST_PARITY etc.)
           localConfig.baud = paramValueUlong;
           byte minFrameDelay = (byte)(frameDelay() / 1000UL) + 1;
@@ -313,6 +342,7 @@ void processPost(char postParameter[]) {
         memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
         localConfig = DEFAULT_CONFIG;
         memcpy(localConfig.macEnd, tempMac, 3);
+        startSerial();
         break;
       }
     case MAC:
@@ -330,10 +360,11 @@ void processPost(char postParameter[]) {
   }
   // new parameter values received, save them to EEPROM
   EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
-  if (action == SERIAL_SOFT) {                // can do it without "please wait" page
-    Serial.flush();
-    Serial.end();
-    startSerial(); // TODO clear queue?
+#ifdef ENABLE_DHCP
+  EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
+#endif                          /* ENABLE_DHCP */
+  if (action == SERIAL_SOFT) {  // can do it without "please wait" page
+    startSerial();
     action = NONE;
   }
 }

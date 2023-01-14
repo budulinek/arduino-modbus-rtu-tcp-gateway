@@ -5,6 +5,7 @@
    - displays main page, renders title and left menu using tables
    - calls content functions depending on the number (i.e. URL) of the requested web page
    - also displays buttons for some of the pages
+   - in order to save flash memory, some HTML closing tags are omitted, new lines in HTML code are also omitted
 
    menuItem
    - returns menu item string depending on the the number (i.e. URL) of the requested web page
@@ -30,7 +31,6 @@ void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[WEB_OUT_BUFFER_SIZE];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
   chunked.print(F("HTTP/1.1 200 OK\r\n"
-                  "Connection: close\r\n"
                   "Content-Type: text/html\r\n"
                   "Transfer-Encoding: chunked\r\n"
                   "\r\n"));
@@ -39,12 +39,8 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<html>"
                   "<head>"
                   "<meta"));
-  if (reqPage == PAGE_STATUS || reqPage == PAGE_WAIT) chunked.print(F(" http-equiv=refresh content=5"));
-#ifdef EXTRA_DIAG
-  if (reqPage == PAGE_INFO) chunked.print(F(" http-equiv=refresh content=5"));  // Socket stats are displayed on System Info page if EXTRA_DIAG enabled
-#endif                                                                          /* EXTRA_DIAG */
-  if (reqPage == PAGE_WAIT) {                                                   // redirect to new IP and web port
-    chunked.print(F(";url=http://"));
+  if (reqPage == PAGE_WAIT) {  // redirect to new IP and web port
+    chunked.print(F(" http-equiv=refresh content=5;url=http://"));
     chunked.print(IPAddress(localConfig.ip));
     chunked.print(F(":"));
     chunked.print(localConfig.webPort);
@@ -56,7 +52,8 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "a{text-decoration:none;color:white}"
                   "table{width:100%;height:100%}"
                   "th{height:0;text-align:left;background-color:#0067AC;color:white;padding:10px}"
-                  "td:first-child {text-align:right;width:30%}"
+                  "td:first-child{text-align:right;width:30%}"
+                  "#x td:nth-child(2){width:1px;white-space:nowrap}"
                   "h1{margin:0}"
                   "#x{padding:0;display:block;height:calc(100vh - 70px);overflow-y:auto}"
                   "</style>"
@@ -66,6 +63,19 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F(" onload='dis(document.getElementById(&quot;box&quot;).checked)'>"
                   "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
 #endif /* ENABLE_DHCP */
+  if (reqPage == PAGE_STATUS) {
+    chunked.print(F("><script>"
+                    "const renew=()=>{"
+                    "fetch('data.json')"  // Call the fetch function passing the url of the API as a parameter
+                    ".then(resp=>{return resp.json();})"
+                    ".then(jo=>{"
+                    "for(var i in jo){if(document.getElementById(i))document.getElementById(i).innerHTML=jo[i];}});"
+                    "};"
+                    "setInterval(()=>renew(),"));
+    chunked.print(FETCH_INTERVAL);
+    chunked.print(F(");"
+                    "</script"));
+  }
   chunked.print(F(">"
                   "<table>"
                   "<tr><th colspan=2>"
@@ -75,7 +85,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
 
                   // Left Menu
                   "<table>"));
-  for (byte i = 1; i < PAGE_WAIT; i++) {
+  for (byte i = 1; i <= PAGE_RTU; i++) {  // RS485 Settings are the last item in the left menu
     chunked.print(F("<tr><th"));
     if ((i) == reqPage) {
       chunked.print(F(" style=background-color:#FF6600"));
@@ -86,7 +96,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
     menuItem(chunked, i);
     chunked.print(F("</a>"));
   }
-  chunked.print(F("<tr></table><td id=x>"
+  chunked.print(F("<tr><td></table><td id=x>"
                   "<form action=/"));  // Main Page
   chunked.print(reqPage);
   chunked.print(F(".htm method=post>"
@@ -157,7 +167,7 @@ void menuItem(ChunkedPrint &chunked, byte item) {
 
 //        System Info
 void contentInfo(ChunkedPrint &chunked) {
-  chunked.print(F("<tr><td>SW Version:<td style=width:1%>"));
+  chunked.print(F("<tr><td>SW Version:<td>"));
   chunked.print(VERSION[0]);
   chunked.print(F("."));
   chunked.print(VERSION[1]);
@@ -190,8 +200,7 @@ void contentInfo(ChunkedPrint &chunked) {
   }
   chunked.print(F(" sockets)<tr><td>MAC Address:<td>"));
   byte macBuffer[6];
-  W5100.getMACAddress(macBuffer);
-  //  Ethernet.MACAddress(macBuffer);
+  Ethernet.MACAddress(macBuffer);
   for (byte i = 0; i < 6; i++) {
     if (macBuffer[i] < 16) chunked.print(F("0"));
     chunked.print(macBuffer[i], HEX);
@@ -215,210 +224,78 @@ void contentInfo(ChunkedPrint &chunked) {
 #endif /* ENABLE_DHCP */
 
   chunked.print(F("<tr><td>IP Address:<td>"));
-  byte tempIP[4];
-  W5100.getIPAddress(tempIP);
-  chunked.print(IPAddress(tempIP));
-
-#ifdef ENABLE_EXTRA_DIAG
-  chunked.print(F("<tr><td>RS485 Data:<td>"));
-  chunked.print(serialTxCount);
-  chunked.print(F(" Tx bytes / "));
-  chunked.print(serialRxCount);
-  chunked.print(F(" Rx bytes"));
-  chunked.print(F("<tr><td>Ethernet Data:<td>"));
-  chunked.print(ethTxCount);
-  chunked.print(F(" Tx bytes / "));
-  chunked.print(ethRxCount);
-  chunked.print(F(" Rx bytes  (excl. WebUI)"
-                  "<tr><td colspan=2>"
-                  "<table style=border-collapse:collapse;text-align:center>"
-                  "<tr><td><td>Socket Mode<td>Socket Status<td>Local Port<td>Remote IP<td>Remote Port"));
-  for (byte i = 0; i < maxSockNum; i++) {
-    chunked.print(F("<tr><td>Socket "));
-    chunked.print(i);
-    chunked.print(F(":<td>"));
-    switch (W5100.readSnMR(i)) {
-      case SnMR::CLOSE:
-        chunked.print(F("CLOSE"));
-        break;
-      case SnMR::TCP:
-        chunked.print(F("TCP"));
-        break;
-      case SnMR::UDP:
-        chunked.print(F("UDP"));
-        break;
-      case SnMR::IPRAW:
-        chunked.print(F("IPRAW"));
-        break;
-      case SnMR::MACRAW:
-        chunked.print(F("MACRAW"));
-        break;
-      case SnMR::PPPOE:
-        chunked.print(F("PPPOE"));
-        break;
-      case SnMR::ND:
-        chunked.print(F("ND"));
-        break;
-      case SnMR::MULTI:
-        chunked.print(F("MULTI"));
-        break;
-      default:
-        break;
-    }
-    chunked.print(F("<td>"));
-    switch (W5100.readSnSR(i)) {
-      case SnSR::CLOSED:
-        chunked.print(F("CLOSED"));
-        break;
-      case SnSR::INIT:
-        chunked.print(F("INIT"));
-        break;
-      case SnSR::LISTEN:
-        chunked.print(F("LISTEN"));
-        break;
-      case SnSR::SYNSENT:
-        chunked.print(F("SYNSENT"));
-        break;
-      case SnSR::SYNRECV:
-        chunked.print(F("SYNRECV"));
-        break;
-      case SnSR::ESTABLISHED:
-        chunked.print(F("ESTABLISHED"));
-        break;
-      case SnSR::FIN_WAIT:
-        chunked.print(F("FIN_WAIT"));
-        break;
-      case SnSR::CLOSING:
-        chunked.print(F("CLOSING"));
-        break;
-      case SnSR::TIME_WAIT:
-        chunked.print(F("TIME_WAIT"));
-        break;
-      case SnSR::CLOSE_WAIT:
-        chunked.print(F("CLOSE_WAIT"));
-        break;
-      case SnSR::LAST_ACK:
-        chunked.print(F("LAST_ACK"));
-        break;
-      case SnSR::UDP:
-        chunked.print(F("UDP"));
-        break;
-      case SnSR::IPRAW:
-        chunked.print(F("IPRAW"));
-        break;
-      case SnSR::MACRAW:
-        chunked.print(F("MACRAW"));
-        break;
-      case SnSR::PPPOE:
-        chunked.print(F("PPPOE"));
-        break;
-      default:
-        break;
-    }
-    chunked.print(F("<td>"));
-    chunked.print(W5100.readSnPORT(i));
-    chunked.print(F("<td>"));
-    uint8_t tempIP[4];
-    W5100.readSnDIPR(i, tempIP);
-    chunked.print(IPAddress(tempIP));
-    chunked.print(F("<td>"));
-    chunked.print(W5100.readSnDPORT(i));
-  }
-  chunked.print(F("</table>"));
-#endif /* ENABLE_EXTRA_DIAG */
+  chunked.print(IPAddress(Ethernet.localIP()));
 }
 
 //        Modbus Status
 void contentStatus(ChunkedPrint &chunked) {
   chunked.print(F("<tr><td>Run Time:<td>"));
-  //  byte mod_seconds = byte((seconds) % 60);
-  //  byte mod_minutes = byte((seconds / 60) % 60);
-  //  unsigned long mod_hours = (seconds / (60UL * 60UL)) % 24UL;
-  //  int days = ();
-  chunked.print(seconds / (3600UL * 24L));
+  helperFetch(chunked, JSON_DAYS);
   chunked.print(F(" days, "));
-  //  chunked.print(byte((seconds% (3600UL * 24L)) / 3600UL));
-  chunked.print(byte((seconds / 3600UL) % 24L));
+  helperFetch(chunked, JSON_HOURS);
   chunked.print(F(" hours, "));
-  chunked.print(byte((seconds / 60UL) % 60L));
+  helperFetch(chunked, JSON_MINS);
   chunked.print(F(" mins, "));
-  chunked.print(byte((seconds) % 60L));
-  chunked.print(F(" secs"
-                  "<tr><td>Modbus Statistics:<td><button name="));
+  helperFetch(chunked, JSON_SECS);
+  chunked.print(F(" secs"));
+
+#ifdef ENABLE_EXTRA_DIAG
+  chunked.print(F("<tr><td>RS485 Data:<td>"));
+  helperFetch(chunked, JSON_RS485_TX);
+  chunked.print(F(" Tx bytes / "));
+  helperFetch(chunked, JSON_RS485_RX);
+  chunked.print(F(" Rx bytes"));
+  chunked.print(F("<tr><td>Ethernet Data:<td>"));
+  helperFetch(chunked, JSON_ETH_TX);
+  chunked.print(F(" Tx bytes / "));
+  helperFetch(chunked, JSON_ETH_RX);
+  chunked.print(F(" Rx bytes  (excl. WebUI)"));
+#endif /* ENABLE_EXTRA_DIAG */
+
+  chunked.print(F("<tr><td>Modbus Statistics:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(RST_STATS);
   chunked.print(F(">Reset Stats</button>"
                   "<tr><td><td>"));
-  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // there is no counter for STAT_ERROR_0B_QUEUE
-    chunked.print(errorCount[i]);
+  for (byte i = 0; i < 4; i++) {  // only first four Modbus status counters are displayed (there is no counter for STAT_ERROR_0B_QUEUE)
+    helperFetch(chunked, JSON_ERROR + i);
     helperStats(chunked, i);
     chunked.print(F("<tr><td><td>"));
   }
-  chunked.print(errorTcpCount);
+  helperFetch(chunked, JSON_ERROR_TCP);
   chunked.print(F(" Invalid TCP/UDP Request"
                   "<tr><td><td>"));
-  chunked.print(errorRtuCount);
+  helperFetch(chunked, JSON_ERROR_RTU);
   chunked.print(F(" Invalid RS485 Response"
                   "<tr><td><td>"));
-  chunked.print(errorTimeoutCount);
+  helperFetch(chunked, JSON_ERROR_TIMEOUT);
   chunked.print(F(" Response Timeout"
                   "<tr><td>Requests Queue:<td>"));
-  chunked.print(queueDataSize);
+  helperFetch(chunked, JSON_QUEUE_DATA);
   chunked.print(F(" / "));
   chunked.print(MAX_QUEUE_DATA);
   chunked.print(F(" bytes"
                   "<tr><td><td>"));
-  chunked.print(queueHeadersSize);
+  helperFetch(chunked, JSON_QUEUE_REQUESTS);
   chunked.print(F(" / "));
   chunked.print(MAX_QUEUE_REQUESTS);
   chunked.print(F(" requests"));
-  queueDataSize = queueData.size();
-  queueHeadersSize = queueHeaders.size();
-  chunked.print(F("<tr><td>Modbus TCP/UDP Masters:"));
-  bool masters = false;
-  for (byte i = 0; i < maxSockNum; i++) {
-    byte tempIP[4];
-    W5100.readSnDIPR(i, tempIP);
-    if (tempIP[0]) {
-      if (W5100.readSnSR(i) == SnSR::UDP) {
-        chunked.print(F("<td><tr><td>UDP:<td>"));
-      } else if (W5100.readSnPORT(i) == localConfig.tcpPort) {
-        chunked.print(F("<td><tr><td>TCP:<td>"));
-      } else {
-        continue;
-      }
-      chunked.print(IPAddress(tempIP));
-      masters = true;
-    }
-  }
-  if (masters == false) chunked.print(F("<td>None"));
+  chunked.print(F("<tr><td>Modbus TCP/UDP Masters:"
+                  "<tr><td><td>"));
+  helperFetch(chunked, JSON_MASTERS);
   chunked.print(F("<tr><td>Modbus RTU Slaves:<td><button name="));
   chunked.print(POST_ACTION);
   chunked.print(F(" value="));
   chunked.print(SCAN);
-  chunked.print(F(">Scan Slaves</button>"));
-  bool slaves = false;
-  for (int k = 1; k < MAX_SLAVES; k++) {
-    for (int s = 0; s < STAT_NUM; s++) {
-      if (getSlaveStatus(k, s) == true || k == scanCounter) {
-        slaves = true;
-        chunked.print(F("<tr><td><td>0x"));
-        if (k < 16) chunked.print(F("0"));
-        chunked.print(k, HEX);
-        if (k == scanCounter) {
-          chunked.print(F(" Scanning..."));
-          break;
-        }
-        helperStats(chunked, s);
-      }
-    }
-  }
-  if (slaves == false && scanCounter == 0) chunked.print(F("<tr><td><td>None"));
+  chunked.print(F(">Scan Slaves</button>"
+                  "<tr><td><td>"));
+  helperFetch(chunked, JSON_SLAVES);
 }
 
 //            IP Settings
 void contentIp(ChunkedPrint &chunked) {
+
 #ifdef ENABLE_DHCP
   chunked.print(F("<tr><td>Auto IP:"
                   "<td><input type=hidden name="));
@@ -430,6 +307,7 @@ void contentIp(ChunkedPrint &chunked) {
   if (extraConfig.enableDhcp) chunked.print(F(" checked"));
   chunked.print(F(">Enable DHCP"));
 #endif /* ENABLE_DHCP */
+
   for (byte j = 0; j < 3; j++) {
     chunked.print(F("<tr><td>"));
     switch (j) {
@@ -488,18 +366,17 @@ void contentTcp(ChunkedPrint &chunked) {
     chunked.print(F("<tr><td>"));
     switch (i) {
       case 0:
-        chunked.print(F("Modbus TCP"));
+        chunked.print(F("Modbus TCP Port:"));
         break;
       case 1:
-        chunked.print(F("Modbus UDP"));
+        chunked.print(F("Modbus UDP Port:"));
         break;
       case 2:
-        chunked.print(F("Web UI"));
+        chunked.print(F("WebUI Port:"));
         break;
       default:
         break;
     }
-    chunked.print(F(" Port:"));
     helperInput(chunked);
     chunked.print(POST_TCP + i);
     chunked.print(F(" min=1 max=65535 value="));
@@ -599,7 +476,7 @@ void contentRtu(ChunkedPrint &chunked) {
     chunked.print(F("</option>"));
   }
   chunked.print(F("</select> bit"
-                  "<tr><td>Frame Delay:"));
+                  "<tr><td>Inter-frame Delay:"));
   helperInput(chunked);
   chunked.print(POST_FRAMEDELAY);
   chunked.print(F(" min="));
@@ -654,6 +531,14 @@ void helperStats(ChunkedPrint &chunked, const byte stat) {
   }
 }
 
+void helperFetch(ChunkedPrint &chunked, const byte JSONKEY) {
+  chunked.print(F("<span id="));
+  chunked.print(JSONKEY);
+  chunked.print(F(">"));
+  jsonVal(chunked, JSONKEY);
+  chunked.print(F("</span>"));
+}
+
 void send404(EthernetClient &client) {
   client.println(F("HTTP/1.1 404 Not Found\r\n"
                    "Content-Length: 0"));
@@ -663,4 +548,121 @@ void send404(EthernetClient &client) {
 void send204(EthernetClient &client) {
   client.println(F("HTTP/1.1 204 No content"));
   client.stop();
+}
+
+void sendJson(EthernetClient &client) {
+  char webOutBuffer[WEB_OUT_BUFFER_SIZE];
+  ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
+  chunked.print(F("HTTP/1.1 200\r\n"
+                  "Content-Type: application/json\r\n"
+                  "Transfer-Encoding: chunked\r\n"
+                  "\r\n"));
+  chunked.begin();
+  chunked.print(F("{"));
+  for (byte i = 0; i < JSON_LAST; i++) {
+    if (i) chunked.print(F(","));
+    chunked.print(F("\""));
+    chunked.print(i);
+    chunked.print(F("\":\""));
+    jsonVal(chunked, i);
+    chunked.print(F("\""));
+  }
+  chunked.print(F("}"));
+  chunked.end();
+}
+
+
+void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
+  unsigned long temp;
+  switch (JSONKEY) {
+    case JSON_MASTERS:
+      {
+        bool masters = false;
+        if (Udp.remoteIP()) {
+          chunked.print(IPAddress(Udp.remoteIP()));
+          chunked.print(F(" UDP Master"));
+          masters = true;
+        }
+        for (byte i = 1; i < maxSockNum; i++) {  // socket 0 is always UDP so we can start the for loop with socket 1
+          EthernetClient client = EthernetClient(i);
+          if (client.remoteIP() && client.localPort() == localConfig.tcpPort) {
+            if (masters) chunked.print(F("<br>"));
+            chunked.print(IPAddress(client.remoteIP()));
+            chunked.print(F(" TCP Master"));
+            masters = true;
+          }
+        }
+      }
+      return;
+    case JSON_SLAVES:
+      {
+        bool slaves = false;
+        for (int k = 1; k < MAX_SLAVES; k++) {
+          for (int s = 0; s < STAT_NUM; s++) {
+            if (getSlaveStatus(k, s) == true || k == scanCounter) {
+              if (slaves) chunked.print(F("<br>"));
+              slaves = true;
+              chunked.print(F("0x"));
+              if (k < 16) chunked.print(F("0"));
+              chunked.print(k, HEX);
+              if (k == scanCounter) {
+                chunked.print(F(" Scanning..."));
+                break;
+              }
+              helperStats(chunked, s);
+            }
+          }
+        }
+      }
+      return;
+    case JSON_SECS:
+      temp = (seconds) % 60L;
+      break;
+    case JSON_MINS:
+      temp = (seconds / 60UL) % 60L;
+      break;
+    case JSON_HOURS:
+      temp = (seconds / 3600UL) % 24L;
+      break;
+    case JSON_DAYS:
+      temp = seconds / (3600UL * 24L);
+      break;
+    case JSON_ERROR ... JSON_ERROR_3:
+      temp = errorCount[JSONKEY - JSON_ERROR];
+      break;
+    case JSON_ERROR_TCP:
+      temp = errorTcpCount;
+      break;
+    case JSON_ERROR_RTU:
+      temp = errorRtuCount;
+      break;
+    case JSON_ERROR_TIMEOUT:
+      temp = errorTimeoutCount;
+      break;
+    case JSON_QUEUE_DATA:
+      temp = (unsigned long)queueDataSize;
+      queueDataSize = queueData.size();
+      break;
+    case JSON_QUEUE_REQUESTS:
+      temp = (unsigned long)queueHeadersSize;
+      queueHeadersSize = queueHeaders.size();
+      break;
+#ifdef ENABLE_EXTRA_DIAG
+    case JSON_RS485_TX:
+      temp = serialTxCount;
+      break;
+    case JSON_RS485_RX:
+      temp = serialRxCount;
+      break;
+    case JSON_ETH_TX:
+      temp = ethTxCount;
+      break;
+    case JSON_ETH_RX:
+      temp = ethRxCount;
+      break;
+#endif /* ENABLE_EXTRA_DIAG */
+    default:
+      break;
+  }
+  chunked.print(temp);
 }
