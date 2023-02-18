@@ -70,7 +70,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Ethernet Data**.\*\* Counter for bytes sent and received via Modbus TCP/UDP.
 
-**Requests Queue**. Monitors the internal request queue (buffer). The limits for bytes and for the number of requests stored in the queue can be configured in advanced settings.
+**Requests Queue**. Monitors internal request queue (buffer). The limits for bytes and for the number of requests stored in the queue can be configured in advanced settings.
 
 **Modbus Statistics**. Counters for various errors. Insigned longs are used, rollover of counters is synchronized:
 * **Slave Responded**. Slave responded with a valid Modbus RTU response within response timeout.
@@ -80,7 +80,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 * **Invalid TCP/UDP Request**. Invalid request was received via TCP or UDP. Request was dropped, no response was sent by the gateway. Validation criteria depends on the Modbus mode:
   - Modbus TCP/UDP: MBAP header (protocol identifier is 0x0000, length is < 255 and corresponds to the number of bytes in the remainder of the Modbus request)
   - Modbus RTU over TCP/UDP: CRC ckeck
-* **Invalid RTU Response**. Invalid data were recieved via RS485. Usually caused by wrong Modbus RTU settings or too short response timeout (any response arriving after timeout is invalid). Validation criteria:
+* **Invalid RTU Response**. Invalid data were recieved via RS485. Could be caused by wrong Modbus RTU settings, short response timeout (any response arriving after timeout is invalid) or Arduino delays in processing the response. Validation criteria:
   - silence between individual bytes is shorter than char timeout specified in Modbus RTU standards
   - CRC check
   - slave address in the Modbus RTU response corresponds to the slave address in the request
@@ -94,11 +94,11 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 **Modbus Slaves**. Shows the slave address (in hex) and the last status (error) for all slaves who responded to a slave scan or who were recipients of a Modbus request.
 
 **Scan Slaves**. An attempt is made to find Modbus RTU slaves connected to the RS485 interface:
-  - scan is launched automaticaly after boot or manualy later
+  - scan is launched automaticaly after boot or manualy
   - scans all slave addresses 1 - 247
   - dummy requests are sent to each slave address for two different Modbus functions (configured in advanced settings)
   - fixed response timeout (very short, configured in advanced settings), only one attempt
-  - gateway marks the slave as "Slave Responded" if any response is received (even error)
+  - gateway marks the slave as "Slave Responded" if any response is sent by the slave (even error)
 
 
 <img src="/pics/modbus3.png" alt="03" style="zoom:100%;" />
