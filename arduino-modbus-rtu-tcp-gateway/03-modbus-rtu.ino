@@ -1,18 +1,18 @@
 /* *******************************************************************
    Modbus RTU functions
 
-   sendSerial
+   sendSerial()
    - sends Modbus RTU requests to HW serial port (RS485 interface)
 
-   recvSerial
+   recvSerial()
    - receives Modbus RTU replies
    - adjusts headers and forward messages as Modbus TCP/UDP or Modbus RTU over TCP/UDP
    - sends Modbus TCP/UDP error messages in case Modbus RTU response timeouts
 
-   checkCRC
+   checkCRC()
    - checks an array and returns true if CRC is OK
 
-   calculateCRC
+   calculateCRC()
 
    ***************************************************************** */
 
@@ -136,7 +136,7 @@ void recvSerial() {
   }
   if (recvTimer.isOver() && rxNdx != 0) {
     // Process Serial data
-    // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
+    // Checks: 1) CRC; 2) address of incoming packet against first request in queue; 3) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
     if (checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
       if (serialIn[1] > 0x80 && (myHeader.requestType & SCAN_REQUEST) == false) {

@@ -1,33 +1,45 @@
 /* *******************************************************************
    Ethernet and serial interface functions
 
-   startSerial
+   startSerial()
    - starts HW serial interface which we use for RS485 line
-   - calculates Modbus RTU character timeout and frame delay
 
-   startEthernet
+   charTime(), charTimeOut(), frameDelay()
+   - calculate Modbus RTU character timeout and inter-frame delay
+
+   startEthernet()
    - initiates ethernet interface
    - if enabled, gets IP from DHCP
    - starts all servers (Modbus TCP, UDP, web server)
 
-   resetFunc
+   resetFunc()
    - well... resets Arduino
 
    maintainDhcp()
    - maintain DHCP lease
 
-   maintainUptime
+   maintainUptime()
    - maintains up time in case of millis() overflow
 
-   maintainCounters
+   maintainCounters(), rollover()
    - synchronizes roll-over of data counters to zero
 
-   CreateTrulyRandomSeed
-   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
-   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+   resetStats()
+   - resets Modbus stats
 
    generateMac()
    - generate random MAC using pseudo random generator (faster and than build-in random())
+
+   manageSockets()
+   - closes sockets which are waiting to be closed or which refuse to close
+   - forwards sockets with data available (webserver or Modbus TCP) for further processing
+   - disconnects (closes) sockets which are too old / idle for too long
+   - opens new sockets if needed (and if available)
+
+   CreateTrulyRandomSeed()
+   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
+   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+
 
    + preprocessor code for identifying microcontroller board
 
@@ -250,7 +262,7 @@ void manageSockets() {
               W5100.execCmdSn(s, Sock_DISCON);  //  send DISCON command...
               lastSocketUse[s] = millis();      //   record time at which it was sent...
                                                 // status becomes LAST_ACK for short time
-            } else if (((W5100.readSnPORT(s) == localConfig.webPort && sockAge > TCP_WEB_DISCON_AGE)
+            } else if (((W5100.readSnPORT(s) == localConfig.webPort && sockAge > WEB_IDLE_TIMEOUT)
                         || (W5100.readSnPORT(s) == localConfig.tcpPort && sockAge > (localConfig.tcpTimeout * 1000UL)))
                        && sockAge > maxAge) {
               oldest = s;        //     record the socket number...

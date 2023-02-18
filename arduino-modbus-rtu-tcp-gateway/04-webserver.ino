@@ -1,18 +1,21 @@
 /* *******************************************************************
    Webserver functions
 
-   recvWeb
+   recvWeb()
    - receives GET requests for web pages
    - receives POST data from web forms
    - calls processPost
-   - sends web pages, for simplicity, all web pages should be numbered (1.htm, 2.htm, ...), the page number is passed to sendPage() function
+   - sends web pages, for simplicity, all web pages should are numbered (1.htm, 2.htm, ...), the page number is passed to sendPage() function
    - executes actions (such as ethernet restart, reboot) during "please wait" web page
 
-   processPost
+   processPost()
    - processes POST data from forms and buttons
    - updates localConfig (in RAM)
    - saves config into EEPROM
    - executes actions which do not require webserver restart
+
+   strToByte(), hex()
+   - helper functions for parsing and writing hex data
 
    ***************************************************************** */
 
@@ -376,7 +379,7 @@ void processPost(EthernetClient &client) {
       requestLen,      // msgLen
       { 0, 0, 0, 0 },  // remIP[4]
       0,               // remPort
-      0,               // requestType
+      UDP_REQUEST,     // requestType
       0,               // atts
     });
     for (byte i = 0; i < requestLen; i++) {

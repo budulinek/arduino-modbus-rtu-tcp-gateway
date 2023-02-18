@@ -1,27 +1,27 @@
 /* *******************************************************************
    Pages for Webserver
 
-   sendPage
+   sendPage()
+   - sends the requested page (incl. 404 error and JSON document)
    - displays main page, renders title and left menu using <div> 
    - calls content functions depending on the number (i.e. URL) of the requested web page
    - also displays buttons for some of the pages
    - in order to save flash memory, some HTML closing tags are omitted, new lines in HTML code are also omitted
 
-   stringPageName
-   - returns menu item string depending on the the number (i.e. URL) of the requested web page
-
-   contentInfo, contentStatus, contentIp, contentTcp, contentRtu
+   contentInfo(), contentStatus(), contentIp(), contentTcp(), contentRtu()
    - render the content of the requested page
 
-   contentWait
-   - renders the "please wait" message instead of the content (= request page number 0xFF, will be forwarded to home page after 5 seconds)
+   contentWait()
+   - renders the "please wait" message instead of the content, will be forwarded to home page after 5 seconds
 
-   tagInputNumber
-   stringStats
-   - renders some repetitive HTML code for inputs
+   tagInputNumber(), tagLabelDiv(), tagButton(), tagDivClose(), tagSpan()
+   - render snippets of repetitive HTML code for <input>, <label>, <div>, <button> and <span> tags
 
-   send404, send204
-   - send error messages
+   stringPageName(), stringStats()
+   - renders repetitive strings for menus, error counters
+
+   jsonVal()
+   - provide JSON value to a corresponding JSON key
 
    ***************************************************************** */
 
@@ -531,9 +531,9 @@ void contentRtu(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Response Timeout"));
   tagInputNumber(chunked);
   chunked.print(POST_TIMEOUT, HEX);
-  chunked.print(F(" min=50 max=2000 value="));
+  chunked.print(F(" min=50 max=5000 value="));
   chunked.print(localConfig.serialTimeout);
-  chunked.print(F("> (50~2000) ms"));
+  chunked.print(F("> (50~5000) ms"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Attempts"));
   tagInputNumber(chunked);
@@ -575,6 +575,14 @@ void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, by
 void tagDivClose(ChunkedPrint &chunked) {
   chunked.print(F("</div>"
                   "</div>"));  // <div class=r>
+}
+
+void tagSpan(ChunkedPrint &chunked, const byte JSONKEY) {
+  chunked.print(F("<span id="));
+  chunked.print(JSONKEY);
+  chunked.print(F(">"));
+  jsonVal(chunked, JSONKEY);
+  chunked.print(F("</span>"));
 }
 
 // Menu item strings
@@ -619,14 +627,6 @@ void stringStats(ChunkedPrint &chunked, const byte stat) {
       break;
   }
   chunked.print(F("<br>"));
-}
-
-void tagSpan(ChunkedPrint &chunked, const byte JSONKEY) {
-  chunked.print(F("<span id="));
-  chunked.print(JSONKEY);
-  chunked.print(F(">"));
-  jsonVal(chunked, JSONKEY);
-  chunked.print(F("</span>"));
 }
 
 void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {

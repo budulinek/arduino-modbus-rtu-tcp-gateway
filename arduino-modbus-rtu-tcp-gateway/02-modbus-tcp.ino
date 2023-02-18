@@ -1,26 +1,29 @@
 /* *******************************************************************
    Modbus TCP/UDP functions
 
-   recvUdp
+   recvUdp()
    - receives Modbus UDP (or Modbus RTU over UDP) messages
    - calls checkRequest
 
-   recvTcp
+   recvTcp()
    - receives Modbus TCP (or Modbus RTU over TCP) messages
    - calls checkRequest
 
-   scanRequest
-   - inserts scan request into queue
-
-   checkRequest
+   checkRequest()
    - checks Modbus TCP/UDP requests (correct MBAP header, CRC in case of Modbus RTU over TCP/UDP)
    - checks availability of queue
-   - stores requests in queue or returns an error
+   - stores requests into queue or returns an error
 
-   deleteRequest
+   scanRequest()
+   - inserts scan request into queue
+
+   deleteRequest()
    - deletes requests from queue
 
-   getSlaveStatus, setSlaveStatus
+   clearQueue()
+   - clears queue and corresponding counters
+
+   getSlaveStatus(), setSlaveStatus()
    - read from and write to bool array
 
    ***************************************************************** */
@@ -126,7 +129,7 @@ void scanRequest() {
     queueHeaders.push(header{
       { 0x00, 0x00 },           // tid[2]
       sizeof(scanCommand) + 1,  // msgLen
-      {},                       // remIP
+      { 0, 0, 0, 0 },           // remIP
       0,                        // remPort
       SCAN_REQUEST,             // requestType
       0,                        // atts
@@ -167,7 +170,7 @@ byte checkRequest(byte inBuffer[], unsigned int msgLength, const uint32_t remote
   // allow only one request to non responding slaves
   if (getSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B_QUEUE)) {
     errorCount[SLAVE_ERROR_0B]++;
-    return 0x0B;  // return modbus error 11 (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
+    return 0x0B;  // return modbus error 11 (Gateway Target Device Failed to Respond)
   } else if (getSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B)) {
     setSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B_QUEUE, true, false);
   } else {

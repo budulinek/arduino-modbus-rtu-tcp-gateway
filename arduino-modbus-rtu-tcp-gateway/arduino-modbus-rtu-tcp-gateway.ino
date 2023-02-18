@@ -1,28 +1,4 @@
 /* Arduino-based Modbus RTU (slaves) to Modbus TCP/UDP (master) gateway with web interface
-   - slaves are connected via RS485 interface
-   - master(s) are connected via ethernet interface
-   - up to 247 Modbus RTU slaves
-   - up to 8 TCP/UDP sockets for Modbus TCP/UDP masters and web interface
-   - RS485 interface protocols:
-            o Modbus RTU
-   - Ethernet interface protocols:
-            o Modbus TCP
-            o Modbus UDP
-            o Modbus RTU over TCP
-            o Modbus RTU over UDP
-   - supports broadcast (slave address 0x00) and error codes
-   - supports all Modbus function codes
-   - settings can be changed via web interface, stored in EEPROM
-   - diagnostics and Modbus RTU scan via web interface
-   - optimized queue for Modbus requests
-            o prioritization of requests to responding slaves
-            o queue will accept only one requests to non-responding slaves
-
-  Connections:
-  Arduino <-> MAX485 module
-  Tx1 <-> DI
-  Rx0 <-> RO
-  Pin 6 <-> DE,RE
 
   Version history
   v0.1 2020-04-05 Initial commit
@@ -40,7 +16,8 @@
   v4.0 2023-01-05 Modbus statistics and error reporting on "Modbus Status" page, add Frame Delay setting for Modbus RTU
                   Optimize Modbus timeout and attempts, significant reduction of code size
   v4.1 2023-01-14 Fetch API, bugfix MAX485
-  v5.0 2023-01-19 Send Modbus Request from WebUI, optimized POST parameter processing (less RAM consumption), select baud rate in WebUI
+  v5.0 2023-02-19 Send Modbus Request from WebUI, optimized POST parameter processing (less RAM consumption), select baud rate in WebUI,
+                  improved TCP socket management, Modbus TCP Idle Timeout settings
 
 */
 
@@ -69,7 +46,7 @@ const int MODBUS_SIZE = 256;                         // size of a MODBUS RTU fra
 #define mySerial Serial                              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
 #define RS485_CONTROL_PIN 6                          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
 const byte ETH_RESET_PIN = 7;                        // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
-const unsigned int TCP_WEB_DISCON_AGE = 300;         // Minimum age (ms) from last client data at which TCP socket could be disconnected, non-blocking. TCP_DISCON_MIN_AGE should be long enough to flush TCP read/write buffers.
+const unsigned int WEB_IDLE_TIMEOUT = 400;           // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
 const unsigned int TCP_DISCON_TIMEOUT = 500;         // Timeout (ms) for client DISCON socket command, non-blocking alternative to https://www.arduino.cc/reference/en/libraries/ethernet/client.setconnectiontimeout/
 const unsigned int TCP_RETRANSMISSION_TIMEOUT = 50;  // Ethernet controller’s timeout (ms), blocking (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissiontimeout/)
 const byte TCP_RETRANSMISSION_COUNT = 3;             // Number of transmission attempts the Ethernet controller will make before giving up (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissioncount/)
@@ -77,17 +54,17 @@ const unsigned int SCAN_TIMEOUT = 200;               // Timeout (ms) for Modbus 
 const byte SCAN_FUNCTION_FIRST = 0x03;               // Function code sent during Modbus RTU Scan request (first attempt)
 const byte SCAN_FUNCTION_SECOND = 0x04;              // Function code sent during Modbus RTU Scan request (second attempt)
 const byte SCAN_DATA_ADDRESS = 0x01;                 // Data address sent during Modbus RTU Scan request (both attempts)
-// Slave is detected as "Responding" if any response (even error) is received.
-const int FETCH_INTERVAL = 2000;                                                     // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
-const byte MAX_RESPONSE_LEN = 16;                                                    // Max length (bytes) of the Modbus response shown in WebUI
-const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };  // List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
+const int FETCH_INTERVAL = 2000;                     // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
+const byte MAX_RESPONSE_LEN = 16;                    // Max length (bytes) of the Modbus response shown in WebUI
+// List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
+const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
 
 /****** EXTRA FUNCTIONS ******/
 
 // these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have a board with more memory
-// #define ENABLE_DHCP            // Enable DHCP (Auto IP settings)
-// #define ENABLE_EXTRA_DIAG      // Enable Ethernet and Serial byte counter.
-// #define TEST_SOCKS
+// #define ENABLE_DHCP       // Enable DHCP (Auto IP settings)
+// #define ENABLE_EXTRA_DIAG // Enable Ethernet and Serial byte counter.
+// #define TEST_SOCKS        // shows 1) port, 2) status and 3) age for all sockets in "Modbus Status" page. IP settings are not available.
 
 /****** DEFAULT FACTORY SETTINGS ******/
 
