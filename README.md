@@ -29,30 +29,31 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 * diagnostics via web interface:
   - send Modbus request and recieve Modbus response
   - scan Modbus slaves on RS485 interface
-  - requests queue status
+  - queue (buffer) status
   - error counts
   - content of the Modbus Status page is updated in the background (fetch API), javascript alert is shown if connection is lost
 * optimized TCP socket management (web interface and Modbus TCP):
   - gateway always listens for new web and Modbus TCP connections
   - existing connections are kept alive (persistent), unless the gateway runs out of available sockets
-  - if there are no available sockets, oldest connections are closed after they are idle for a certain time (Modbus TCP idle timeout is configured in web UI)
-* optimized queue for Modbus requests:
+  - if there are no available sockets, oldest connections are closed after they are idle for a certain time, Modbus TCP idle timeout is configured in user settings (web UI), webserver idle timeout is configured in advanced settings (sketch)
+* optimized queue (buffer) for Modbus requests:
   - queue will accept only one requests to a non-responding slave
   - requests to responding slaves are prioritized over requests to non-responding slaves
+  - queue size configured in advanced settings (sketch)
 * user settings:
-  - can be changed via web interface (see bellow)
+  - can be changed via web interface (see screenshots bellow)
   - stored in EEPROM
   - retained during firmware upgrade (only in case of major version change, Arduino loads factory defaults)
   - all web interface inputs have proper validation
   - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
   - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
 * advanced settings:
-  - can be changed in sketch (initial section of arduino-modbus-rtu-tcp-gateway.ino)
+  - can be changed in sketch (see the initial section of arduino-modbus-rtu-tcp-gateway.ino)
   - stored in flash memory
 
 <img src="/pics/modbus1.png" alt="01" style="zoom:100%;" />
 
-**Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in arduino-modbus-rtu-tcp-gateway.ino). MAC address is retained.
+**Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
 
 **Reboot**.
 
