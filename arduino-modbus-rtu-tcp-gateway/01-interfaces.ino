@@ -1,33 +1,45 @@
 /* *******************************************************************
    Ethernet and serial interface functions
 
-   startSerial
+   startSerial()
    - starts HW serial interface which we use for RS485 line
-   - calculates Modbus RTU character timeout and frame delay
 
-   startEthernet
+   charTime(), charTimeOut(), frameDelay()
+   - calculate Modbus RTU character timeout and inter-frame delay
+
+   startEthernet()
    - initiates ethernet interface
    - if enabled, gets IP from DHCP
    - starts all servers (Modbus TCP, UDP, web server)
 
-   resetFunc
+   resetFunc()
    - well... resets Arduino
 
    maintainDhcp()
    - maintain DHCP lease
 
-   maintainUptime
+   maintainUptime()
    - maintains up time in case of millis() overflow
 
-   maintainCounters
+   maintainCounters(), rollover()
    - synchronizes roll-over of data counters to zero
 
-   CreateTrulyRandomSeed
-   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
-   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+   resetStats()
+   - resets Modbus stats
 
    generateMac()
    - generate random MAC using pseudo random generator (faster and than build-in random())
+
+   manageSockets()
+   - closes sockets which are waiting to be closed or which refuse to close
+   - forwards sockets with data available (webserver or Modbus TCP) for further processing
+   - disconnects (closes) sockets which are too old / idle for too long
+   - opens new sockets if needed (and if available)
+
+   CreateTrulyRandomSeed()
+   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
+   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+
 
    + preprocessor code for identifying microcontroller board
 
@@ -35,15 +47,7 @@
 
 
 void startSerial() {
-  mySerial.flush();
-  mySerial.end();
-  queueHeaders.clear();            // <- eats memory!
-  queueData.clear();
-  scanReqInQueue = false;
-  priorityReqInQueue= false;
-  memset(stat[STAT_ERROR_0B_QUEUE], 0, sizeof(stat[STAT_ERROR_0B_QUEUE]));  
-  sendTimer.sleep(0);
-  mySerial.begin(localConfig.baud, localConfig.serialConfig);
+  mySerial.begin((localConfig.baud * 100UL), localConfig.serialConfig);
 #ifdef RS485_CONTROL_PIN
   pinMode(RS485_CONTROL_PIN, OUTPUT);
   digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Init Transceiver
@@ -57,12 +61,12 @@ unsigned long charTime() {
     (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
     (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
   if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
-  return (bits * 1000000UL) / (unsigned long)localConfig.baud;
+  return (bits * 10000UL) / (unsigned long)localConfig.baud;
 }
 
 // character timeout
 unsigned long charTimeOut() {
-  if (localConfig.baud <= 19200UL) {
+  if (localConfig.baud <= 192) {
     return 1.5 * charTime();  // inter-character time-out should be 1,5T
   } else {
     return 750;
@@ -71,7 +75,7 @@ unsigned long charTimeOut() {
 
 // minimum frame delay
 unsigned long frameDelay() {
-  if (localConfig.baud <= 19200UL) {
+  if (localConfig.baud <= 192) {
     return 3.5 * charTime();  // inter-frame delay should be 3,5T
   } else {
     return 1750;  // 1750 μs
@@ -99,14 +103,16 @@ void startEthernet() {
 #else  /* ENABLE_DHCP */
   Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);  // No DNS
 #endif /* ENABLE_DHCP */
+  Ethernet.setRetransmissionTimeout(TCP_RETRANSMISSION_TIMEOUT);
+  Ethernet.setRetransmissionCount(TCP_RETRANSMISSION_COUNT);
   modbusServer = EthernetServer(localConfig.tcpPort);
   webServer = EthernetServer(localConfig.webPort);
   Udp.begin(localConfig.udpPort);
   modbusServer.begin();
   webServer.begin();
-  if (Ethernet.hardwareStatus() == EthernetW5100) {
-    maxSockNum = 4;  // W5100 chip never supports more than 4 sockets
-  }
+#if MAX_SOCK_NUM > 4
+  if (W5100.getChip() == 51) maxSockNum = 4;  // W5100 chip never supports more than 4 sockets
+#endif
 }
 
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
@@ -123,6 +129,7 @@ void maintainDhcp() {
 }
 #endif /* ENABLE_DHCP */
 
+#ifdef ENABLE_EXTRA_DIAG
 void maintainUptime() {
   unsigned long milliseconds = millis();
   if (last_milliseconds > milliseconds) {
@@ -136,19 +143,23 @@ void maintainUptime() {
   //We add the "remaining_seconds", so that we can continue measuring the time passed from the last boot of the device.
   seconds = (milliseconds / 1000) + remaining_seconds;
 }
+#endif /* ENABLE_EXTRA_DIAG */
 
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const unsigned long ROLLOVER = 0xFFFFFF00;
-  for (byte i = 0; i < STAT_ERROR_0B_QUEUE; i++) {  // there is no counter for STAT_ERROR_0B_QUEUE
+  for (byte i = 0; i < SLAVE_ERROR_0B_QUEUE; i++) {  // there is no counter for SLAVE_ERROR_0B_QUEUE
     if (errorCount[i] > ROLLOVER) {
       return true;
     }
   }
-  if (errorTcpCount > ROLLOVER || errorRtuCount > ROLLOVER || errorTimeoutCount > ROLLOVER || seconds > ROLLOVER) {
+  if (errorTcpCount > ROLLOVER || errorRtuCount > ROLLOVER || errorTimeoutCount > ROLLOVER) {
     return true;
   }
 #ifdef ENABLE_EXTRA_DIAG
+  if (seconds > ROLLOVER) {
+    return true;
+  }
   if (serialTxCount > ROLLOVER || serialRxCount > ROLLOVER || ethTxCount > ROLLOVER || ethRxCount > ROLLOVER) {
     return true;
   }
@@ -161,8 +172,8 @@ void resetStats() {
   errorTcpCount = 0;
   errorRtuCount = 0;
   errorTimeoutCount = 0;
-  remaining_seconds = -(millis() / 1000);
 #ifdef ENABLE_EXTRA_DIAG
+  remaining_seconds = -(millis() / 1000);
   ethRxCount = 0;
   ethTxCount = 0;
   serialRxCount = 0;
@@ -178,6 +189,123 @@ void generateMac() {
   for (byte i = 0; i < 3; i++) {
     localConfig.macEnd[i] = randomBuffer & 0xFF;
     randomBuffer >>= 8;
+  }
+}
+
+
+
+#if MAX_SOCK_NUM == 8
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };  // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#elif MAX_SOCK_NUM == 4
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };                          // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
+#endif
+
+// from https://github.com/SapientHetero/Ethernet/blob/master/src/socket.cpp
+void manageSockets() {
+  uint32_t maxAge = 0;         // the 'age' of the socket in a 'disconnectable' state that was last used the longest time ago
+  byte oldest = MAX_SOCK_NUM;  // the socket number of the 'oldest' disconnectable socket
+  byte modbusListening = MAX_SOCK_NUM;
+  byte webListening = MAX_SOCK_NUM;
+  byte dataAvailable = MAX_SOCK_NUM;
+  byte socketsAvailable = 0;
+  // SPI.beginTransaction(SPI_ETHERNET_SETTINGS);								// begin SPI transaction
+  // look at all the hardware sockets, record and take action based on current states
+  for (byte s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
+    byte status = W5100.readSnSR(s);                 //  get socket status...
+    uint32_t sockAge = millis() - lastSocketUse[s];  // age of the current socket
+    if (socketInQueue[s] > 0) {
+      lastSocketUse[s] = millis();
+      continue;  // do not close Modbus TCP sockets currently processed (in queue)
+    }
+
+    switch (status) {
+      case SnSR::CLOSED:
+        {
+          socketsAvailable++;
+        }
+        break;
+      case SnSR::LISTEN:
+      case SnSR::SYNRECV:
+        {
+          lastSocketUse[s] = millis();
+          if (W5100.readSnPORT(s) == localConfig.webPort) {
+            webListening = s;
+          } else {
+            modbusListening = s;
+          }
+        }
+        break;
+      case SnSR::FIN_WAIT:
+      case SnSR::CLOSING:
+      case SnSR::TIME_WAIT:
+      case SnSR::LAST_ACK:
+        {
+          socketsAvailable++;                  // socket will be available soon
+          if (sockAge > TCP_DISCON_TIMEOUT) {  //     if it's been more than TCP_CLIENT_DISCON_TIMEOUT since disconnect command was sent...
+            W5100.execCmdSn(s, Sock_CLOSE);    //	    send CLOSE command...
+            lastSocketUse[s] = millis();       //       and record time at which it was sent so we don't do it repeatedly.
+          }
+        }
+        break;
+      case SnSR::ESTABLISHED:
+      case SnSR::CLOSE_WAIT:
+        {
+          if (EthernetClient(s).available() > 0) {
+            dataAvailable = s;
+            lastSocketUse[s] = millis();
+          } else {
+            // remote host closed connection, our end still open
+            if (status == SnSR::CLOSE_WAIT) {
+              socketsAvailable++;               // socket will be available soon
+              W5100.execCmdSn(s, Sock_DISCON);  //  send DISCON command...
+              lastSocketUse[s] = millis();      //   record time at which it was sent...
+                                                // status becomes LAST_ACK for short time
+            } else if (((W5100.readSnPORT(s) == localConfig.webPort && sockAge > WEB_IDLE_TIMEOUT)
+                        || (W5100.readSnPORT(s) == localConfig.tcpPort && sockAge > (localConfig.tcpTimeout * 1000UL)))
+                       && sockAge > maxAge) {
+              oldest = s;        //     record the socket number...
+              maxAge = sockAge;  //      and make its age the new max age.
+            }
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (dataAvailable != MAX_SOCK_NUM) {
+    EthernetClient client = EthernetClient(dataAvailable);
+    if (W5100.readSnPORT(dataAvailable) == localConfig.webPort) {
+      recvWeb(client);
+    } else {
+      recvTcp(client);
+    }
+  }
+
+  if (modbusListening == MAX_SOCK_NUM) {
+    modbusServer.begin();
+  } else if (webListening == MAX_SOCK_NUM) {
+    webServer.begin();
+  }
+
+  // If needed, disconnect socket that's been idle (ESTABLISHED without data recieved) the longest
+  if (oldest != MAX_SOCK_NUM && socketsAvailable == 0 && (webListening == MAX_SOCK_NUM || modbusListening == MAX_SOCK_NUM)) {
+    disconSocket(oldest);
+  }
+
+  // SPI.endTransaction();	// Serves to o release the bus for other devices to access it. Since the ethernet chip is the only device
+  // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction()
+}
+
+void disconSocket(byte s) {
+  if (W5100.readSnSR(s) == SnSR::ESTABLISHED) {
+    W5100.execCmdSn(s, Sock_DISCON);  // Sock_DISCON does not close LISTEN sockets
+    lastSocketUse[s] = millis();      //   record time at which it was sent...
+  } else {
+    W5100.execCmdSn(s, Sock_CLOSE);  //  send DISCON command...
   }
 }
 

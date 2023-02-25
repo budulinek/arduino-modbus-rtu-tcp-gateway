@@ -1,35 +1,39 @@
 /* *******************************************************************
    Webserver functions
 
-   recvWeb
+   recvWeb()
    - receives GET requests for web pages
    - receives POST data from web forms
    - calls processPost
-   - sends web pages, for simplicity, all web pages should be numbered (1.htm, 2.htm, ...), the page number is passed to sendPage() function
+   - sends web pages, for simplicity, all web pages should are numbered (1.htm, 2.htm, ...), the page number is passed to sendPage() function
    - executes actions (such as ethernet restart, reboot) during "please wait" web page
 
-   processPost
+   processPost()
    - processes POST data from forms and buttons
    - updates localConfig (in RAM)
    - saves config into EEPROM
    - executes actions which do not require webserver restart
 
+   strToByte(), hex()
+   - helper functions for parsing and writing hex data
+
    ***************************************************************** */
 
-const byte WEB_IN_BUFFER_SIZE = 128;  // size of web server read buffer (reads a complete line), 128 bytes necessary for POST data
-const byte SMALL_BUFFER_SIZE = 32;    // a smaller buffer for uri
+const byte URI_SIZE = 24;   // a smaller buffer for uri
+const byte POST_SIZE = 24;  // a smaller buffer for single post parameter + key
 
 // Actions that need to be taken after saving configuration.
 enum action_type : byte {
   NONE,
-  FACTORY,      // Load default factory settings (but keep MAC address)
-  MAC,          // Generate new random MAC
-  REBOOT,       // Reboot the microcontroller
-  ETH_SOFT,     // Ethernet software reset
-  SERIAL_SOFT,  // Serial software reset
-  SCAN,         // Initialize RS485 scan
-  RST_STATS,    // Reset Modbus Statistics
-  WEB           // Restart webserver
+  FACTORY,        // Load default factory settings (but keep MAC address)
+  MAC,            // Generate new random MAC
+  REBOOT,         // Reboot the microcontroller
+  RESET_ETH,      // Ethernet reset
+  RESET_SERIAL,   // Serial reset
+  SCAN,           // Initialize RTU scan
+  RESET_STATS,    // Reset Modbus Statistics
+  CLEAR_REQUEST,  // Clear Modbus Request form
+  WEB             // Restart webserver
 };
 enum action_type action;
 
@@ -37,13 +41,14 @@ enum action_type action;
 // URL of the page (*.htm) contains number corresponding to its position in this array.
 // The following enum array can have a maximum of 10 elements (incl. PAGE_NONE and PAGE_WAIT)
 enum page : byte {
-  PAGE_NONE,  // reserved for NULL
+  PAGE_ERROR,  // 404 Error
   PAGE_INFO,
   PAGE_STATUS,
   PAGE_IP,
   PAGE_TCP,
   PAGE_RTU,
   PAGE_WAIT,  // page with "Reloading. Please wait..." message.
+  PAGE_DATA,  // data.json
 };
 
 // Keys for POST parameters, used in web forms and processed by processPost() function.
@@ -67,20 +72,33 @@ enum post_key : byte {
   POST_DNS,
   POST_DNS_1,
   POST_DNS_2,
-  POST_DNS_3,       // DNS                || all these 16 enum elements must be listed in succession!!  ||
-  POST_TCP,         // TCP port                  || Because HTML code for these 3 ports              ||
-  POST_UDP,         // UDP port                  || is generated through one for-loop,               ||
-  POST_WEB,         // web UI port               || these 3 elements must be listed in succession!!  ||
-  POST_RTU_OVER,    // RTU over TCP/UDP
-  POST_BAUD,        // baud rate
-  POST_DATA,        // data bits
-  POST_PARITY,      // parity
-  POST_STOP,        // stop bits
-  POST_FRAMEDELAY,  //frame delay
-  POST_TIMEOUT,     // response timeout
-  POST_ATTEMPTS,    // number of request attempts
-  POST_ACTION,      // actions on Tools page
+  POST_DNS_3,        // DNS                || all these 16 enum elements must be listed in succession!!  ||
+  POST_TCP,          // TCP port                  || Because HTML code for these 3 ports              ||
+  POST_UDP,          // UDP port                  || is generated through one for-loop,               ||
+  POST_WEB,          // web UI port               || these 3 elements must be listed in succession!!  ||
+  POST_RTU_OVER,     // RTU over TCP/UDP
+  POST_TCP_TIMEOUT,  // Modbus TCP socket close timeout
+  POST_BAUD,         // baud rate
+  POST_DATA,         // data bits
+  POST_PARITY,       // parity
+  POST_STOP,         // stop bits
+  POST_FRAMEDELAY,   //frame delay
+  POST_TIMEOUT,      // response timeout
+  POST_ATTEMPTS,     // number of request attempts
+  POST_REQ,          // Modbus request send from WebUI (first byte)
+  POST_REQ_1,
+  POST_REQ_2,
+  POST_REQ_3,
+  POST_REQ_4,
+  POST_REQ_5,
+  POST_REQ_6,
+  POST_REQ_LAST,  // 8 bytes in total
+  POST_ACTION,    // actions on Tools page
 };
+
+byte request[POST_REQ_LAST - POST_REQ + 1];  // Array to store Modbus request sent from WebUI
+byte requestLen = 0;                         // Length of the Modbus request send from WebUI
+
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
 enum JSON_type : byte {
@@ -97,208 +115,196 @@ enum JSON_type : byte {
   JSON_ERROR_TIMEOUT,
   JSON_QUEUE_DATA,
   JSON_QUEUE_REQUESTS,
-  JSON_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
-  JSON_SLAVES,   // list of Modbus RTU slaves separated by <br>
-#ifdef ENABLE_EXTRA_DIAG
-  JSON_RS485_TX,
-  JSON_RS485_RX,
+  JSON_TCP_UDP_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
+  JSON_SLAVES,           // list of Modbus RTU slaves separated by <br>
+  JSON_RTU_TX,
+  JSON_RTU_RX,
   JSON_ETH_TX,
   JSON_ETH_RX,
-#endif        /* ENABLE_EXTRA_DIAG */
+  JSON_RESPONSE,
+  JSON_SOCKETS,
   JSON_LAST,  // Must be the very last element in this array
 };
 
-
-void recvWeb() {
-  EthernetClient client = webServer.available();
-  if (client) {
-    char uri[SMALL_BUFFER_SIZE];  // the requested page
-    // char requestParameter[SMALL_BUFFER_SIZE];      // parameter appended to the URI after a ?
-    // char postParameter[SMALL_BUFFER_SIZE] {'\0'};         // parameter transmitted in the body / by POST
-    if (client.available()) {
-      char webInBuffer[WEB_IN_BUFFER_SIZE]{ '\0' };  // buffer for incoming data
-      unsigned int i = 0;                            // index / current read position
-      enum status_type : byte {
-        REQUEST,
-        CONTENT_LENGTH,
-        EMPTY_LINE,
-        BODY
-      };
-      enum status_type status;
-      status = REQUEST;
-      while (client.available()) {
-        char c = client.read();
-        if (c == '\n') {
-          if (status == REQUEST)  // read the first line
-          {
-            // now split the input
-            char *ptr;
-            ptr = strtok(webInBuffer, " ");  // strtok willdestroy the newRequest
-            ptr = strtok(NULL, " ");
-            strlcpy(uri, ptr, sizeof(uri));      // enthält noch evtl. parameter
-            status = EMPTY_LINE;                 // jump to next status
-          } else if (status > REQUEST && i < 2)  // check if we have an empty line
-          {
-            status = BODY;
-          }
-          i = 0;
-          memset(webInBuffer, 0, sizeof(webInBuffer));
-        } else {
-          if (i < (WEB_IN_BUFFER_SIZE - 1)) {
-            webInBuffer[i] = c;
-            i++;
-            webInBuffer[i] = '\0';
-          }
-        }
-      }
-      if (status == BODY)  // status 3 could end without linefeed, therefore we takeover here also
-      {
-        if (webInBuffer[0] != '\0') {
-          processPost(webInBuffer);
-        }
-      }
-    }
-
-    // Get number of the requested page from URI
-    byte reqPage = 0;       //requested page
-    if (!strcmp(uri, "/"))  // the homepage System Info
-      reqPage = PAGE_INFO;
-    else if ((uri[0] == '/') && !strcmp(uri + 2, ".htm")) {
-      reqPage = (byte)(uri[1] - 48);  // Convert single ASCII char to byte
-    }
-
-    // Actions that require "please wait" page
-    if (action == WEB || action == REBOOT || action == ETH_SOFT || action == FACTORY || action == MAC) {
-      reqPage = PAGE_WAIT;
-    }
-
-    // Send page
-    if ((reqPage > 0) && (reqPage <= PAGE_WAIT))
-      sendPage(client, reqPage);
-    else if (!strcmp(uri, "/data.json"))
-      sendJson(client);
-    else if (!strcmp(uri, "/favicon.ico"))  // a favicon
-      send204(client);                      // if you don't have a favicon, send 204
-    else                                    // if the page is unknown, HTTP response code 404
-      send404(client);                      // defaults to 404 error
-
-    // Do all actions before the "please wait" redirects (5s delay at the moment)
-    if (reqPage == PAGE_WAIT) {
-      for (byte n = 0; n < maxSockNum; n++) {
-        // in case of webserver restart, stop only clients from old webserver (clients with port different from current settings)
-        EthernetClient client = EthernetClient(n);
-        unsigned int port = client.localPort();
-        // for WEB, stop only clients from old webserver (those that do not match modbus ports or current web port); for other actions stop all clients
-        if (action != WEB || (port && port != localConfig.webPort && port != localConfig.udpPort && port != localConfig.tcpPort)) {
-          client.flush();
-          client.stop();
-        }
-      }
-      switch (action) {
-        case WEB:
-          webServer = EthernetServer(localConfig.webPort);
-          break;
-        case REBOOT:
-          mySerial.flush();
-          mySerial.end();
-          resetFunc();
-          break;
-        default:  // ETH_SOFT, FACTORY, MAC
-          Udp.stop();
-          startEthernet();
-          break;
-      }
-    }
-    action = NONE;
+void recvWeb(EthernetClient &client) {
+  char uri[URI_SIZE];  // the requested page
+  memset(uri, 0, sizeof(uri));
+  while (client.available()) {        // start reading the first line which should look like: GET /uri HTTP/1.1
+    if (client.read() == ' ') break;  // find space before /uri
   }
+  byte len = 0;
+  while (client.available() && len < sizeof(uri) - 1) {
+    char c = client.read();  // parse uri
+    if (c == ' ') break;     // find space after /uri
+    uri[len] = c;
+    len++;
+  }
+  while (client.available()) {
+    if (client.read() == '\r')
+      if (client.read() == '\n')
+        if (client.read() == '\r')
+          if (client.read() == '\n')
+            break;  // find 2 end of lines between header and body
+  }
+  if (client.available()) {
+    processPost(client);  // parse post parameters
+  }
+
+  // Get the requested page from URI
+  byte reqPage = PAGE_ERROR;  // requested page, 404 error is a default
+  if (uri[0] == '/') {
+    if (uri[1] == '\0')  // the homepage System Info
+      reqPage = PAGE_INFO;
+    else if (!strcmp(uri + 2, ".htm")) {
+      reqPage = byte(uri[1] - 48);  // Convert single ASCII char to byte
+      if (reqPage >= PAGE_WAIT) reqPage = PAGE_ERROR;
+    } else if (!strcmp(uri, "/d.json")) {
+      reqPage = PAGE_DATA;
+    }
+  }
+  // Actions that require "please wait" page
+  if (action == WEB || action == MAC || action == RESET_ETH || action == REBOOT || action == FACTORY) {
+    reqPage = PAGE_WAIT;
+  }
+  // Send page
+  sendPage(client, reqPage);
+
+  // Do all actions before the "please wait" redirects (5s delay at the moment)
+  if (reqPage == PAGE_WAIT) {
+    switch (action) {
+      case WEB:
+        for (byte s = 0; s < maxSockNum; s++) {
+          // close old webserver TCP connections
+          if (EthernetClient(s).localPort() != localConfig.tcpPort) {
+            disconSocket(s);
+          }
+        }
+        webServer = EthernetServer(localConfig.webPort);
+        break;
+      case MAC:
+      case RESET_ETH:
+        for (byte s = 0; s < maxSockNum; s++) {
+          // close all TCP and UDP sockets
+          disconSocket(s);
+        }
+        startEthernet();
+        break;
+      case REBOOT:
+      case FACTORY:
+        resetFunc();
+        break;
+      default:
+        break;
+    }
+  }
+  action = NONE;
 }
+
 
 // This function stores POST parameter values in localConfig.
 // Most changes are saved and applied immediatelly, some changes (IP settings, web server port, reboot) are saved but applied later after "please wait" page is sent.
-void processPost(char postParameter[]) {
-  char *point = NULL;
-  char *sav1 = NULL;  // for outer strtok_r
-  point = strtok_r(postParameter, "&", &sav1);
-  while (point != NULL) {
-    char *paramKey;
-    char *paramValue;
-    char *sav2 = NULL;                       // for inner strtok_r
-    paramKey = strtok_r(point, "=", &sav2);  // inner strtok_r, use sav2
-    paramValue = strtok_r(NULL, "=", &sav2);
-    point = strtok_r(NULL, "&", &sav1);
-    if (!paramValue)
+void processPost(EthernetClient &client) {
+  while (client.available()) {
+    char post[POST_SIZE];
+    byte len = 0;
+    while (client.available() && len < sizeof(post) - 1) {
+      char c = client.read();
+      if (c == '&') break;
+      post[len] = c;
+      len++;
+    }
+    post[len] = '\0';
+    char *paramKey = post;
+    char *paramValue = post;
+    while (*paramValue) {
+      if (*paramValue == '=') {
+        paramValue++;
+        break;
+      }
+      paramValue++;
+    }
+    if (*paramValue == '\0')
       continue;  // do not process POST parameter if there is no parameter value
-    byte paramKeyByte = atoi(paramKey);
-    unsigned long paramValueUlong = atol(paramValue);
+    byte paramKeyByte = strToByte(paramKey);
+    unsigned int paramValueUint = atol(paramValue);  // TODO use atoi?
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
         break;
 #ifdef ENABLE_DHCP
       case POST_DHCP:
         {
-          extraConfig.enableDhcp = (byte)paramValueUlong;
+          extraConfig.enableDhcp = byte(paramValueUint);
         }
         break;
       case POST_DNS ... POST_DNS_3:
         {
-          extraConfig.dns[paramKeyByte - POST_DNS] = (byte)paramValueUlong;
+          extraConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
         }
         break;
 #endif /* ENABLE_DHCP */
+      case POST_REQ ... POST_REQ_LAST:
+        {
+          requestLen = paramKeyByte - POST_REQ + 1;
+          request[requestLen - 1] = strToByte(paramValue);
+        }
+        break;
       case POST_IP ... POST_IP_3:
         {
-          action = ETH_SOFT;  // this ETH_SOFT is triggered when the user changes anything on the "IP Settings" page.
-          // No need to trigger ETH_SOFT for other cases (POST_SUBNET, POST_GATEWAY etc.)
-          localConfig.ip[paramKeyByte - POST_IP] = (byte)paramValueUlong;
+          action = RESET_ETH;  // this RESET_ETH is triggered when the user changes anything on the "IP Settings" page.
+          // No need to trigger RESET_ETH for other cases (POST_SUBNET, POST_GATEWAY etc.)
+          localConfig.ip[paramKeyByte - POST_IP] = byte(paramValueUint);
         }
         break;
       case POST_SUBNET ... POST_SUBNET_3:
         {
-          localConfig.subnet[paramKeyByte - POST_SUBNET] = (byte)paramValueUlong;
+          localConfig.subnet[paramKeyByte - POST_SUBNET] = byte(paramValueUint);
         }
         break;
       case POST_GATEWAY ... POST_GATEWAY_3:
         {
-          localConfig.gateway[paramKeyByte - POST_GATEWAY] = (byte)paramValueUlong;
+          localConfig.gateway[paramKeyByte - POST_GATEWAY] = byte(paramValueUint);
         }
         break;
       case POST_TCP:
         {
-          for (byte i = 0; i < maxSockNum; i++) {
-            EthernetClient client = EthernetClient(i);
-            if (client.localPort() == localConfig.tcpPort) {
-              client.flush();
-              client.stop();
+          if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from WebUI port
+            for (byte s = 0; s < maxSockNum; s++) {
+              if (EthernetClient(s).localPort() == localConfig.tcpPort) {  // close only Modbus TCP sockets
+                disconSocket(s);
+              }
             }
+            localConfig.tcpPort = paramValueUint;
+            modbusServer = EthernetServer(localConfig.tcpPort);
           }
-          localConfig.tcpPort = (unsigned int)paramValueUlong;
-          modbusServer = EthernetServer(localConfig.tcpPort);
         }
         break;
       case POST_UDP:
         {
-          localConfig.udpPort = (unsigned int)paramValueUlong;
+          localConfig.udpPort = paramValueUint;
           Udp.stop();
           Udp.begin(localConfig.udpPort);
         }
         break;
       case POST_WEB:
         {
-          if (localConfig.webPort != (unsigned int)paramValueUlong) {
-            localConfig.webPort = (unsigned int)paramValueUlong;
+          if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from Modbus TCP port
+            localConfig.webPort = paramValueUint;
             action = WEB;
           }
         }
         break;
       case POST_RTU_OVER:
-        localConfig.enableRtuOverTcp = (byte)paramValueUlong;
+        localConfig.enableRtuOverTcp = byte(paramValueUint);
+        break;
+      case POST_TCP_TIMEOUT:
+        localConfig.tcpTimeout = paramValueUint;
         break;
       case POST_BAUD:
         {
-          action = SERIAL_SOFT;  // this SERIAL_SOFT is triggered when the user changes anything on the "RS485 Settings" page.
-          // No need to trigger ETH_SOFT for other cases (POST_DATA, POST_PARITY etc.)
-          localConfig.baud = paramValueUlong;
-          byte minFrameDelay = (byte)(frameDelay() / 1000UL) + 1;
+          action = RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
+          // No need to trigger RESET_ETH for other cases (POST_DATA, POST_PARITY etc.)
+          localConfig.baud = paramValueUint;
+          byte minFrameDelay = byte((frameDelay() / 1000UL) + 1);
           if (localConfig.frameDelay < minFrameDelay) {
             localConfig.frameDelay = minFrameDelay;
           }
@@ -306,30 +312,30 @@ void processPost(char postParameter[]) {
         break;
       case POST_DATA:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xF9) | (((byte)paramValueUlong - 5) << 1);
+          localConfig.serialConfig = (localConfig.serialConfig & 0xF9) | ((byte(paramValueUint) - 5) << 1);
         }
         break;
       case POST_PARITY:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xCF) | ((byte)paramValueUlong << 4);
+          localConfig.serialConfig = (localConfig.serialConfig & 0xCF) | (byte(paramValueUint) << 4);
         }
         break;
       case POST_STOP:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xF7) | (((byte)paramValueUlong - 1) << 3);
+          localConfig.serialConfig = (localConfig.serialConfig & 0xF7) | ((byte(paramValueUint) - 1) << 3);
         }
         break;
       case POST_FRAMEDELAY:
-        localConfig.frameDelay = (byte)paramValueUlong;
+        localConfig.frameDelay = byte(paramValueUint);
         break;
       case POST_TIMEOUT:
-        localConfig.serialTimeout = paramValueUlong;
+        localConfig.serialTimeout = paramValueUint;
         break;
       case POST_ATTEMPTS:
-        localConfig.serialAttempts = (byte)paramValueUlong;
+        localConfig.serialAttempts = byte(paramValueUint);
         break;
       case POST_ACTION:
-        action = (action_type)paramValueUlong;
+        action = action_type(paramValueUint);
         break;
       default:
         break;
@@ -342,29 +348,83 @@ void processPost(char postParameter[]) {
         memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
         localConfig = DEFAULT_CONFIG;
         memcpy(localConfig.macEnd, tempMac, 3);
-        startSerial();
         break;
       }
     case MAC:
       generateMac();
       break;
-    case RST_STATS:
+    case RESET_STATS:
       resetStats();
+      break;
+    case RESET_SERIAL:
+      clearQueue();
+      startSerial();
       break;
     case SCAN:
       scanCounter = 1;
       memset(&stat, 0, sizeof(stat));  // clear all status flags
       break;
+    case CLEAR_REQUEST:
+      requestLen = 0;
+      responseLen = 0;
+      break;
     default:
       break;
+  }
+  // if new Modbus request received, put into queue
+  if (requestLen > 1 && queueHeaders.available() > 1 && queueData.available() > requestLen) {  // at least 2 bytes in request (slave address and function)
+    // push to queue
+    queueHeaders.push(header{
+      { 0x00, 0x00 },  // tid[2]
+      requestLen,      // msgLen
+      { 0, 0, 0, 0 },  // remIP[4]
+      0,               // remPort
+      UDP_REQUEST,     // requestType
+      0,               // atts
+    });
+    for (byte i = 0; i < requestLen; i++) {
+      queueData.push(request[i]);
+    }
+    responseLen = 0;  // clear old Modbus Response from WebUI
   }
   // new parameter values received, save them to EEPROM
   EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
 #ifdef ENABLE_DHCP
   EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
-#endif                          /* ENABLE_DHCP */
-  if (action == SERIAL_SOFT) {  // can do it without "please wait" page
-    startSerial();
-    action = NONE;
+#endif
+}
+
+// takes 2 chars, 1 char + null byte or 1 null byte
+byte strToByte(const char myStr[]) {
+  if (!myStr) return 0;
+  byte x = 0;
+  for (byte i = 0; i < 2; i++) {
+    char c = myStr[i];
+    if (c >= '0' && c <= '9') {
+      x *= 16;
+      x += c - '0';
+    } else if (c >= 'A' && c <= 'F') {
+      x *= 16;
+      x += (c - 'A') + 10;
+    } else if (c >= 'a' && c <= 'f') {
+      x *= 16;
+      x += (c - 'a') + 10;
+    }
   }
+  return x;
+}
+
+// from https://github.com/RobTillaart/printHelpers
+char __printbuffer[3];
+char *hex(byte val) {
+  char *buffer = __printbuffer;
+  byte digits = 2;
+  buffer[digits] = '\0';
+  while (digits > 0) {
+    byte v = val & 0x0F;
+    val >>= 4;
+    digits--;
+    buffer[digits] = (v < 10) ? '0' + v : ('A' - 10) + v;
+  }
+  return buffer;
 }

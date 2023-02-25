@@ -1,23 +1,21 @@
 /* *******************************************************************
    Modbus RTU functions
 
-   sendSerial
+   sendSerial()
    - sends Modbus RTU requests to HW serial port (RS485 interface)
 
-   recvSerial
+   recvSerial()
    - receives Modbus RTU replies
    - adjusts headers and forward messages as Modbus TCP/UDP or Modbus RTU over TCP/UDP
    - sends Modbus TCP/UDP error messages in case Modbus RTU response timeouts
 
-   checkCRC
+   checkCRC()
    - checks an array and returns true if CRC is OK
 
-   calculateCRC
+   calculateCRC()
 
    ***************************************************************** */
 
-int rxNdx = 0;
-int txNdx = 0;
 
 void sendSerial() {
   if (!sendTimer.isOver()) {
@@ -26,6 +24,7 @@ void sendSerial() {
   if (queueHeaders.isEmpty()) {
     return;
   }
+  static int txNdx = 0;
   header myHeader = queueHeaders.first();
   switch (serialState) {
     case 0:  // IDLE: Optimize queue (prioritize requests from responding slaves) and trigger sending via serial
@@ -93,9 +92,16 @@ void sendSerial() {
           deleteRequest();
         } else if (myHeader.atts >= localConfig.serialAttempts) {
           // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
-          setSlaveStatus(queueData[0], STAT_ERROR_0B, true, false);
-          byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, 0x00, 0x03 };
-          byte PDU[5] = { queueData[0], (byte)(queueData[1] + 0x80), 0x0B };
+          setSlaveStatus(queueData[0], SLAVE_ERROR_0B, true, false);
+          byte MBAP[] = { myHeader.tid[0],
+                          myHeader.tid[1],
+                          0x00,
+                          0x00,
+                          0x00,
+                          0x03 };
+          byte PDU[5] = { queueData[0],
+                          byte(queueData[1] + 0x80),
+                          0x0B };
           crc = 0xFFFF;
           for (byte i = 0; i < 3; i++) {
             calculateCRC(PDU[i]);
@@ -105,7 +111,7 @@ void sendSerial() {
           sendResponse(MBAP, PDU, 5);
           errorTimeoutCount++;
         } else {
-          setSlaveStatus(queueData[0], STAT_ERROR_0B_QUEUE, true, false);
+          setSlaveStatus(queueData[0], SLAVE_ERROR_0B_QUEUE, true, false);
           errorTimeoutCount++;
         }                 // if (myHeader.atts >= MAX_RETRY)
         serialState = 0;  // IDLE
@@ -117,28 +123,35 @@ void sendSerial() {
 }
 
 void recvSerial() {
+  static int rxNdx = 0;
   static byte serialIn[MODBUS_SIZE];
   while (mySerial.available() > 0) {
+    byte b = mySerial.read();
     if (rxNdx < MODBUS_SIZE) {
-      serialIn[rxNdx] = mySerial.read();
+      serialIn[rxNdx] = b;
       rxNdx++;
-    } else {            // frame longer than maximum allowed
-      mySerial.read();  // CRC will fail and errorRtuCount will be recorded down the road
-    }
+    }  // if frame longer than maximum allowed, CRC will fail and errorRtuCount will be recorded down the road
     recvTimer.sleep(charTimeOut());
     sendTimer.sleep(localConfig.frameDelay * 1000UL);  // delay next serial write
   }
   if (recvTimer.isOver() && rxNdx != 0) {
     // Process Serial data
-    // Checks: 1) RTU frame is without errors; 2) CRC; 3) address of incoming packet against first request in queue; 4) only expected responses are forwarded to TCP/UDP
+    // Checks: 1) CRC; 2) address of incoming packet against first request in queue; 3) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
     if (checkCRC(serialIn, rxNdx) == true && serialIn[0] == queueData[0] && serialState == WAITING) {
       if (serialIn[1] > 0x80 && (myHeader.requestType & SCAN_REQUEST) == false) {
-        setSlaveStatus(serialIn[0], STAT_ERROR_0X, true, false);
+        setSlaveStatus(serialIn[0], SLAVE_ERROR_0X, true, false);
       } else {
-        setSlaveStatus(serialIn[0], STAT_OK, true, myHeader.requestType & SCAN_REQUEST);
+        setSlaveStatus(serialIn[0], SLAVE_OK, true, myHeader.requestType & SCAN_REQUEST);
       }
-      byte MBAP[] = { myHeader.tid[0], myHeader.tid[1], 0x00, 0x00, highByte(rxNdx - 2), lowByte(rxNdx - 2) };
+      byte MBAP[] = {
+        myHeader.tid[0],
+        myHeader.tid[1],
+        0x00,
+        0x00,
+        highByte(rxNdx - 2),
+        lowByte(rxNdx - 2)
+      };
       sendResponse(MBAP, serialIn, rxNdx);
       serialState = IDLE;
     } else {
@@ -151,8 +164,15 @@ void recvSerial() {
   }
 }
 
-void sendResponse(const byte MBAP[], const byte PDU[], const unsigned int pduLength) {
+void sendResponse(const byte MBAP[], const byte PDU[], const int pduLength) {
   header myHeader = queueHeaders.first();
+  responseLen = 0;
+  while (responseLen < pduLength) {  // include CRC
+    if (responseLen < MAX_RESPONSE_LEN) {
+      response[responseLen] = PDU[responseLen];
+    }
+    responseLen++;
+  }
   if (myHeader.requestType & UDP_REQUEST) {
     Udp.beginPacket(myHeader.remIP, myHeader.remPort);
     if (localConfig.enableRtuOverTcp) Udp.write(PDU, pduLength);
@@ -166,8 +186,10 @@ void sendResponse(const byte MBAP[], const byte PDU[], const unsigned int pduLen
     if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
 #endif /* ENABLE_EXTRA_DIAG */
   } else if (myHeader.requestType & TCP_REQUEST) {
-    EthernetClient client = EthernetClient(myHeader.requestType & TCP_REQUEST);
-    if (client.connected()) {  // TODO check remote IP and port?
+    byte sock = myHeader.requestType & TCP_REQUEST_MASK;
+    EthernetClient client = EthernetClient(sock);
+    //    if (W5100.readSnSR(sock) == SnSR::ESTABLISHED && W5100.readSnDPORT(sock) == myHeader.remPort) {  // Check remote port should be enough or check also rem IP?
+    if (W5100.readSnSR(sock) == SnSR::ESTABLISHED) {  // Check remote port should be enough or check also rem IP?
       if (localConfig.enableRtuOverTcp) client.write(PDU, pduLength);
       else {
         client.write(MBAP, 6);
