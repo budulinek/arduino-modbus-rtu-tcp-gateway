@@ -356,7 +356,7 @@ ISR(WDT_vect) {
 #elif defined(__MK66FX1M0__)
 #define BOARD F("Teensy 3.6")
 #else
-#error "Unknown board"
+#define BOARD F("Unknown board")
 #endif
 
 #else  // --------------- Arduino ------------------
@@ -412,7 +412,7 @@ ISR(WDT_vect) {
 #elif defined(ARDUINO_ARC32_TOOLS)
 #define BOARD F("Arduino 101")
 #else
-#error "Unknown board"
+#define BOARD F("Unknown board")
 #endif
 
 #endif
