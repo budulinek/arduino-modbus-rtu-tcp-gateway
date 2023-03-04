@@ -109,10 +109,10 @@ void sendSerial() {
           PDU[3] = lowByte(crc);  // send CRC, low byte first
           PDU[4] = highByte(crc);
           sendResponse(MBAP, PDU, 5);
-          errorTimeoutCount++;
+          errorCount[ERROR_TIMEOUT]++;
         } else {
           setSlaveStatus(queueData[0], SLAVE_ERROR_0B_QUEUE, true, false);
-          errorTimeoutCount++;
+          errorCount[ERROR_TIMEOUT]++;
         }                 // if (myHeader.atts >= MAX_RETRY)
         serialState = 0;  // IDLE
       }
@@ -130,7 +130,7 @@ void recvSerial() {
     if (rxNdx < MODBUS_SIZE) {
       serialIn[rxNdx] = b;
       rxNdx++;
-    }  // if frame longer than maximum allowed, CRC will fail and errorRtuCount will be recorded down the road
+    }  // if frame longer than maximum allowed, CRC will fail and errorCount[ERROR_RTU] will be recorded down the road
     recvTimer.sleep(charTimeOut());
     sendTimer.sleep(localConfig.frameDelay * 1000UL);  // delay next serial write
   }
@@ -155,7 +155,7 @@ void recvSerial() {
       sendResponse(MBAP, serialIn, rxNdx);
       serialState = IDLE;
     } else {
-      errorRtuCount++;
+      errorCount[ERROR_RTU]++;
     }
 #ifdef ENABLE_EXTRA_DIAG
     serialRxCount += rxNdx;

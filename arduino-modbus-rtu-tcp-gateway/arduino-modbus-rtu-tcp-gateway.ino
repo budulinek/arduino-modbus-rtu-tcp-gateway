@@ -18,10 +18,11 @@
   v4.1 2023-01-14 Fetch API, bugfix MAX485
   v5.0 2023-02-19 Send Modbus Request from WebUI, optimized POST parameter processing (less RAM consumption), select baud rate in WebUI,
                   improved TCP socket management, Modbus TCP Idle Timeout settings
+  v6.0 2023-XX-XX Save error counters to EEPROM
 
 */
 
-const byte VERSION[] = { 5, 0 };
+const byte VERSION[] = { 6, 0 };
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -45,7 +46,8 @@ const byte MAX_SLAVES = 247;                         // max number of Modbus sla
 const int MODBUS_SIZE = 256;                         // size of a MODBUS RTU frame (determines size of various buffers)
 #define mySerial Serial                              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
 #define RS485_CONTROL_PIN 6                          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
-const byte ETH_RESET_PIN = 7;                        // Ethernet shield reset pin (deals with power on reset issue of the ethernet shield)
+const byte ETH_RESET_PIN = 7;                        // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
+const unsigned int ETH_RESET_DELAY = 500;            // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
 const unsigned int WEB_IDLE_TIMEOUT = 400;           // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
 const unsigned int TCP_DISCON_TIMEOUT = 500;         // Timeout (ms) for client DISCON socket command, non-blocking alternative to https://www.arduino.cc/reference/en/libraries/ethernet/client.setconnectiontimeout/
 const unsigned int TCP_RETRANSMISSION_TIMEOUT = 50;  // Ethernet controller’s timeout (ms), blocking (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissiontimeout/)
@@ -55,6 +57,7 @@ const byte SCAN_FUNCTION_FIRST = 0x03;               // Function code sent durin
 const byte SCAN_FUNCTION_SECOND = 0x04;              // Function code sent during Modbus RTU Scan request (second attempt)
 const byte SCAN_DATA_ADDRESS = 0x01;                 // Data address sent during Modbus RTU Scan request (both attempts)
 const int FETCH_INTERVAL = 2000;                     // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
+const unsigned int STATS_EEPROM_INTERVAL = 60;       // Interval (minutes) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
 const byte MAX_RESPONSE_LEN = 16;                    // Max length (bytes) of the Modbus response shown in WebUI
 // List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
 const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
@@ -62,8 +65,8 @@ const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152
 /****** EXTRA FUNCTIONS ******/
 
 // these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have a board with more memory
-// #define ENABLE_DHCP       // Enable DHCP (Auto IP settings)
-// #define ENABLE_EXTRA_DIAG // Enable Ethernet and Serial byte counter.
+// #define ENABLE_DHCP        // Enable DHCP (Auto IP settings)
+// #define ENABLE_EXTRA_DIAG  // Enable Ethernet and Serial byte counter.
 // #define TEST_SOCKS        // shows 1) port, 2) status and 3) age for all sockets in "Modbus Status" page. IP settings are not available.
 
 /****** DEFAULT FACTORY SETTINGS ******/
@@ -112,7 +115,7 @@ const config_type DEFAULT_CONFIG = {
 // local configuration values (stored in RAM)
 config_type localConfig;
 // Start address where config is saved in EEPROM
-const byte CONFIG_START = 128;
+const int CONFIG_START = 128;
 
 #ifdef ENABLE_DHCP
 typedef struct
@@ -186,9 +189,11 @@ void MicroTimer::sleep(unsigned long sleepTimeMs) {
 
 MicroTimer recvTimer;
 MicroTimer sendTimer;
+MicroTimer statsEepromTimer;  // timer to delay writing statistics to EEPROM
 
 #define RS485_TRANSMIT HIGH
 #define RS485_RECEIVE LOW
+
 byte scanCounter = 1;  // Start Modbus RTU scan after boot
 enum state : byte {
   IDLE,
@@ -199,42 +204,32 @@ enum state : byte {
 
 byte serialState;
 
+
+/****** RUN TIME AND DATA COUNTERS ******/
+
 enum status : byte {
   SLAVE_OK,              // Slave Responded
   SLAVE_ERROR_0X,        // Slave Responded with Error (Codes 1~8)
   SLAVE_ERROR_0A,        // Gateway Overloaded (Code 10)
   SLAVE_ERROR_0B,        // Slave Failed to Respond (Code 11)
   SLAVE_ERROR_0B_QUEUE,  // Slave Failed to Respond (Code 11) + in Queue
-  SLAVE_ERROR_LAST       // Number of status flags in this enum. Must be the last element within this enum!!
+  ERROR_TIMEOUT,         // Response Timeout
+  ERROR_RTU,             // Invalid RTU Response
+  ERROR_TCP,             // Invalid TCP/UDP Request
+  ERROR_LAST             // Number of status flags in this enum. Must be the last element within this enum!!
 };
 
 // bool arrays for storing Modbus RTU status of individual slaves
-uint8_t stat[SLAVE_ERROR_LAST][(MAX_SLAVES + 1 + 7) / 8];
-
-// Scan request is in the queue
-bool scanReqInQueue = false;
-// byte tcpReqInQueue = 0;
-
-byte scanFunction = 0x03;  //
-
-// Counter for priority requests in the queue
-byte priorityReqInQueue;
-
-byte response[MAX_RESPONSE_LEN];
-byte responseLen;  // stores actual length of the response shown in WebUI
-
-
-/****** RUN TIME AND DATA COUNTERS ******/
-
-volatile uint32_t seed1;  // seed1 is generated by CreateTrulyRandomSeed()
-volatile int8_t nrot;
-uint32_t seed2 = 17111989;  // seed2 is static
+uint8_t slaveStatus[SLAVE_ERROR_0B_QUEUE + 1][(MAX_SLAVES + 1 + 7) / 8];  // SLAVE_ERROR_0B_QUEUE is the last status of slaves
 
 // array for storing error counts
-uint32_t errorCount[SLAVE_ERROR_0B_QUEUE];  // there is no counter for SLAVE_ERROR_0B_QUEUE
-uint32_t errorTcpCount;
-uint32_t errorRtuCount;
-uint32_t errorTimeoutCount;
+uint32_t errorCount[ERROR_LAST];  // there is no counter for SLAVE_ERROR_0B_QUEUE
+
+bool scanReqInQueue = false;  // Scan request is in the queue
+byte priorityReqInQueue;      // Counter for priority requests in the queue
+
+byte response[MAX_RESPONSE_LEN];  // buffer to store the last Modbus response
+byte responseLen;                 // stores actual length of the response shown in WebUI
 
 uint16_t queueDataSize;
 uint8_t queueHeadersSize;
@@ -253,21 +248,31 @@ unsigned long ethTxCount = 0;
 unsigned long ethRxCount = 0;
 #endif /* ENABLE_EXTRA_DIAG */
 
+volatile uint32_t seed1;  // seed1 is generated by CreateTrulyRandomSeed()
+volatile int8_t nrot;
+uint32_t seed2 = 17111989;  // seed2 is static
+
+
 /****** SETUP: RUNS ONCE ******/
 
 void setup() {
   CreateTrulyRandomSeed();
 
+  int address = CONFIG_START;
   // is config already stored in EEPROM?
-  if (EEPROM.read(CONFIG_START) == VERSION[0]) {
-    // load (CONFIG_START) the local configuration struct from EEPROM
-    EEPROM.get(CONFIG_START + 1, localConfig);
+  if (EEPROM.read(address) == VERSION[0]) {
+    // load local configuration struct from EEPROM, from CONFIG_START address
+    address += 1;
+    EEPROM.get(address, localConfig);
+    address += sizeof(localConfig);
+    EEPROM.get(address, errorCount);
+    address += sizeof(errorCount);
 #ifdef ENABLE_DHCP
-    if (EEPROM.read(CONFIG_START + 1 + sizeof(localConfig)) == EXTRA_CONFIG.dummyChar) {
-      EEPROM.get(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
+    if (EEPROM.read(address) == EXTRA_CONFIG.dummyChar) {
+      EEPROM.get(address, extraConfig);
     } else {
       extraConfig = EXTRA_CONFIG;
-      EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
+      EEPROM.put(address, extraConfig);
     }
 #endif /* ENABLE_DHCP */
   } else {
@@ -275,11 +280,16 @@ void setup() {
     localConfig = DEFAULT_CONFIG;
     // generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
     generateMac();
-    EEPROM.write(CONFIG_START, VERSION[0]);
-    EEPROM.put(CONFIG_START + 1, localConfig);
+    address = CONFIG_START;
+    EEPROM.update(address, VERSION[0]);
+    address += 1;
+    EEPROM.put(address, localConfig);
+    address += sizeof(localConfig);
+    EEPROM.put(address, errorCount);
+    address += sizeof(errorCount);
 #ifdef ENABLE_DHCP
     extraConfig = EXTRA_CONFIG;
-    EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
+    EEPROM.put(address, extraConfig);
 #endif /* ENABLE_DHCP */
   }
   startSerial();
@@ -292,10 +302,15 @@ void loop() {
 
   scanRequest();
   sendSerial();
-  recvSerial();
   recvUdp();
-  // recvTcp();
-  // recvWeb();
+  recvSerial();
+
+  manageSockets();
+
+  if (statsEepromTimer.isOver()) {
+    statsEepromTimer.sleep(STATS_EEPROM_INTERVAL * 60 * 1000);
+    EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), errorCount);
+  }
 
   if (rollover()) resetStats();
 
@@ -305,6 +320,4 @@ void loop() {
 #ifdef ENABLE_DHCP
   maintainDhcp();
 #endif /* ENABLE_DHCP */
-
-  manageSockets();
 }

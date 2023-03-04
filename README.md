@@ -30,7 +30,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - send Modbus request and recieve Modbus response
   - scan Modbus slaves on RS485 interface
   - queue (buffer) status
-  - error counts
+  - error counters (stored in EEPROM)
   - content of the Modbus Status page is updated in the background (fetch API), javascript alert is shown if connection is lost
 * optimized TCP socket management (web interface and Modbus TCP):
   - gateway always listens for new web and Modbus TCP connections
@@ -73,7 +73,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Requests Queue**. Monitors internal request queue (buffer). The limits for bytes and for the number of requests stored in the queue can be configured in advanced settings.
 
-**Modbus Statistics**. Counters for various errors. Insigned longs are used, rollover of counters is synchronized:
+**Modbus Statistics**. Counters for various errors. Counters are periodically saved to EEPROM. Insigned longs are used, rollover of counters is synchronized:
 * **Slave Responded**. Slave responded with a valid Modbus RTU response within response timeout.
 * **Slave Responded with Error (Codes 1~8)**. Slave responded, but with an error. For the list of error codes see https://en.wikipedia.org/wiki/Modbus#Exception_responses.
 * **Gateway Overloaded (Code 10)**. Request queue is full (either the number of bytes stored or the number of requests stored). Request was dropped and the gateway responded with an error code 10.

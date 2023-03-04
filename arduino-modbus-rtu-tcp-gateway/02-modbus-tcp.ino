@@ -152,12 +152,12 @@ byte checkRequest(byte inBuffer[], unsigned int msgLength, const uint32_t remote
   byte addressPos = 6 * !localConfig.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
   if (localConfig.enableRtuOverTcp) {                   // check CRC for Modbus RTU over TCP/UDP
     if (checkCRC(inBuffer, msgLength) == false) {
-      errorTcpCount++;
+      errorCount[ERROR_TCP]++;
       return 0;  // drop request and do not return any error code
     }
   } else {  // check MBAP header structure for Modbus TCP/UDP
     if (inBuffer[2] != 0x00 || inBuffer[3] != 0x00 || inBuffer[4] != 0x00 || inBuffer[5] != msgLength - 6) {
-      errorTcpCount++;
+      errorCount[ERROR_TCP]++;
       return 0;  // drop request and do not return any error code
     }
   }
@@ -220,24 +220,24 @@ void clearQueue() {
   scanReqInQueue = false;
   priorityReqInQueue = false;
   memset(socketInQueue, 0, sizeof(socketInQueue));
-  memset(stat[SLAVE_ERROR_0B_QUEUE], 0, sizeof(stat[SLAVE_ERROR_0B_QUEUE]));
+  memset(slaveStatus[SLAVE_ERROR_0B_QUEUE], 0, sizeof(slaveStatus[SLAVE_ERROR_0B_QUEUE]));
   sendTimer.sleep(0);
 }
 
 bool getSlaveStatus(const uint8_t slave, const byte status) {
   if (slave >= MAX_SLAVES) return false;  // error
-  return (stat[status][slave / 8] & masks[slave & 7]) > 0;
+  return (slaveStatus[status][slave / 8] & masks[slave & 7]) > 0;
 }
 
 void setSlaveStatus(const uint8_t slave, byte status, const bool value, const bool isScan) {
-  if (slave >= MAX_SLAVES) return;  // error
+  if (slave >= MAX_SLAVES || status > SLAVE_ERROR_0B_QUEUE) return;  // error
   if (value == 0) {
-    stat[status][slave / 8] &= ~masks[slave & 7];
+    slaveStatus[status][slave / 8] &= ~masks[slave & 7];
   } else {
-    for (byte i = 0; i < SLAVE_ERROR_LAST; i++) {
-      stat[i][slave / 8] &= ~masks[slave & 7];  // set all other flags to false
+    for (byte i = 0; i <= SLAVE_ERROR_0B_QUEUE; i++) {
+      slaveStatus[i][slave / 8] &= ~masks[slave & 7];  // set all other flags to false, SLAVE_ERROR_0B_QUEUE is the last slave status
     }
-    stat[status][slave / 8] |= masks[slave & 7];
+    slaveStatus[status][slave / 8] |= masks[slave & 7];
     if (status != SLAVE_ERROR_0B_QUEUE && isScan == false) errorCount[status]++;  // there is no counter for SLAVE_ERROR_0B_QUEUE, ignor scans in statistics
   }
 }

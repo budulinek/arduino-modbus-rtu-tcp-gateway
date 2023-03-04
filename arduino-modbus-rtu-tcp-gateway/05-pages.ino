@@ -74,39 +74,57 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F(">"
                   "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
                   "<style>"
-                  "body,.m{padding:1px;margin:0;font-family:sans-serif}"  // class=m  - navigation menu (left)
-                  "h1,h4{padding:10px}"                                   // h1 - main title of the page
-                  "h1,.m,h4{background:#0067AC;margin:1px}"               // h4 - text in navigation menu and header of page content
-                  ".m,.c{height:calc(100vh - 71px)}"                      // class=c - content of a page
-                  ".m{min-width:20%}"                                     //
-                  ".c{flex-grow:1;overflow-y:auto}"                       //
-                  ".w,.r{display:flex}"                                   // class=w - wrapper (m + c)
-                  "a,h1,h4{color:white;text-decoration:none}"             // a - items in left navigation menu
-                  ".c h4{padding-left:30%;margin-bottom:20px}"            //
-                  ".r{margin:4px}"                                        // class=r - row inside content
-                  "label{width:30%;text-align:right;margin-right:2px}"    // label - left side (column) of a row
-                  "input,button,select{margin-top:-2px}"                  // improve vertical allignment of input, button and select
-                  ".s{text-align:right}"                                  // class=s - select input with numbers
-                  ".s>option{direction:rtl}"                              //
-                  ".i{text-align:center;width:3ch;color:black}"           // class=i - input for Modbus request (and Modbus response)
-                  ".n{width:8ch}"                                         // class=n - input type=number
+                  /*
+                  HTML Tags
+                    h1 - main title of the page
+                    h4 - text in navigation menu and header of page content
+                    a - items in left navigation menu
+                    label - first cell of a row in content
+                  CSS Classes
+                    w - wrapper (includes m + c)
+                    m  - navigation menu (left)
+                    c - content of a page
+                    r - row inside a content
+                    i - short input (byte or IP address octet)
+                    n - input type=number
+                    s - select input with numbers
+                    p - inputs disabled by id=o checkbox
+                  CSS Ids
+                    o - checkbox which disables other checkboxes and inputs
+                  */
+                  "body,.m{padding:1px;margin:0;font-family:sans-serif}"
+                  "h1,h4{padding:10px}"
+                  "h1,.m,h4{background:#0067AC;margin:1px}"
+                  ".m,.c{height:calc(100vh - 71px)}"
+                  ".m{min-width:20%}"
+                  ".c{flex-grow:1;overflow-y:auto}"
+                  ".w,.r{display:flex}"
+                  "a,h1,h4{color:white;text-decoration:none}"
+                  ".c h4{padding-left:30%;margin-bottom:20px}"
+                  ".r{margin:4px}"
+                  "label{width:30%;text-align:right;margin-right:2px}"
+                  "input,button,select{margin-top:-2px}"  // improve vertical allignment of input, button and select
+                  ".s{text-align:right}"
+                  ".s>option{direction:rtl}"
+                  ".i{text-align:center;width:3ch;color:black}"
+                  ".n{width:8ch}"
                   "</style>"
                   "</head>"
                   "<body"));
 #ifdef ENABLE_DHCP
-  chunked.print(F(" onload='dis(document.getElementById(&quot;box&quot;).checked)'>"
-                  "<script>function dis(st) {var x = document.getElementsByClassName('ip');for (var i = 0; i < x.length; i++) {x[i].disabled = st}}</script"));
+  chunked.print(F(" onload=g(document.getElementById('o').checked)>"
+                  "<script>function g(h) {var x = document.getElementsByClassName('p');for (var i = 0; i < x.length; i++) {x[i].disabled = h}}</script"));
 #endif /* ENABLE_DHCP */
   if (reqPage == PAGE_STATUS) {
     chunked.print(F("><script>"
                     "var a;"
-                    "const renew=()=>{"
+                    "const b=()=>{"
                     "fetch('d.json')"  // Call the fetch function passing the url of the API as a parameter
-                    ".then(resp=>{return resp.json();a=0})"
-                    ".then(jo=>{for(var i in jo){if(document.getElementById(i))document.getElementById(i).innerHTML=jo[i];}})"
+                    ".then(e=>{return e.json();a=0})"
+                    ".then(f=>{for(var i in f){if(document.getElementById(i))document.getElementById(i).innerHTML=f[i];}})"
                     ".catch(()=>{if(!a){alert('Connnection lost');a=1}})"
                     "};"
-                    "setInterval(()=>renew(),"));
+                    "setInterval(()=>b(),"));
     chunked.print(FETCH_INTERVAL);
     chunked.print(F(");"
                     "</script"));
@@ -233,26 +251,13 @@ void contentStatus(ChunkedPrint &chunked) {
 
 #ifdef ENABLE_EXTRA_DIAG
   tagLabelDiv(chunked, F("Run Time"));
-  tagSpan(chunked, JSON_DAYS);
-  chunked.print(F(" days, "));
-  tagSpan(chunked, JSON_HOURS);
-  chunked.print(F(" hours, "));
-  tagSpan(chunked, JSON_MINS);
-  chunked.print(F(" mins, "));
-  tagSpan(chunked, JSON_SECS);
-  chunked.print(F(" secs"));
+  tagSpan(chunked, JSON_TIME);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("RTU Data"));
-  tagSpan(chunked, JSON_RTU_TX);
-  chunked.print(F(" Tx bytes / "));
-  tagSpan(chunked, JSON_RTU_RX);
-  chunked.print(F(" Rx bytes"));
+  tagSpan(chunked, JSON_RTU_DATA);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Ethernet Data"));
-  tagSpan(chunked, JSON_ETH_TX);
-  chunked.print(F(" Tx bytes / "));
-  tagSpan(chunked, JSON_ETH_RX);
-  chunked.print(F(" Rx bytes  (excl. WebUI)"));
+  tagSpan(chunked, JSON_ETH_DATA);
   tagDivClose(chunked);
 #endif /* ENABLE_EXTRA_DIAG */
 
@@ -281,27 +286,11 @@ void contentStatus(ChunkedPrint &chunked) {
   tagSpan(chunked, JSON_RESPONSE);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Requests Queue"));
-  tagSpan(chunked, JSON_QUEUE_DATA);
-  chunked.print(F(" / "));
-  chunked.print(MAX_QUEUE_DATA);
-  chunked.print(F(" bytes<br>"));
-  tagSpan(chunked, JSON_QUEUE_REQUESTS);
-  chunked.print(F(" / "));
-  chunked.print(MAX_QUEUE_REQUESTS);
-  chunked.print(F(" requests"));
+  tagSpan(chunked, JSON_QUEUE);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Statistics"));
   tagButton(chunked, F("Reset Stats"), RESET_STATS);
-  for (byte i = 0; i < 4; i++) {  // only first four Modbus status counters are displayed (there is no counter for SLAVE_ERROR_0B_QUEUE)
-    tagSpan(chunked, JSON_ERROR + i);
-    stringStats(chunked, i);
-  }
-  tagSpan(chunked, JSON_ERROR_TCP);
-  chunked.print(F(" Invalid TCP/UDP Request<br>"));
-  tagSpan(chunked, JSON_ERROR_RTU);
-  chunked.print(F(" Invalid RTU Response<br>"));
-  tagSpan(chunked, JSON_ERROR_TIMEOUT);
-  chunked.print(F(" Response Timeout"));
+  tagSpan(chunked, JSON_STATS);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Masters"));
   tagSpan(chunked, JSON_TCP_UDP_MASTERS);
@@ -320,9 +309,9 @@ void contentIp(ChunkedPrint &chunked) {
   chunked.print(F("<input type=hidden name="));
   chunked.print(POST_DHCP, HEX);
   chunked.print(F(" value=0>"
-                  "<input type=checkbox id=box name="));
+                  "<input type=checkbox id=o name="));
   chunked.print(POST_DHCP, HEX);
-  chunked.print(F(" onclick=dis(this.checked) value=1"));
+  chunked.print(F(" onclick=g(this.checked) value=1"));
   if (extraConfig.enableDhcp) chunked.print(F(" checked"));
   chunked.print(F(">Enable DHCP"));
   tagDivClose(chunked);
@@ -345,7 +334,7 @@ void contentIp(ChunkedPrint &chunked) {
     for (byte i = 0; i < 4; i++) {
       chunked.print(F("<input name="));
       chunked.print(POST_IP + i + (j * 4), HEX);
-      chunked.print(F(" class='ip i' required maxlength=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
+      chunked.print(F(" class='p i' required maxlength=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
       switch (j) {
         case 0:
           chunked.print(localConfig.ip[i]);
@@ -369,7 +358,7 @@ void contentIp(ChunkedPrint &chunked) {
   for (byte i = 0; i < 4; i++) {
     chunked.print(F("<input name="));
     chunked.print(POST_DNS + i, HEX);
-    chunked.print(F(" type=tel class=ip required maxlength=3 size=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
+    chunked.print(F(" class='p i' required maxlength=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
     chunked.print(extraConfig.dns[i]);
     chunked.print(F(">"));
     if (i < 3) chunked.print(F("."));
@@ -623,6 +612,15 @@ void stringStats(ChunkedPrint &chunked, const byte stat) {
     case SLAVE_ERROR_0B_QUEUE:
       chunked.print(F(" Slave Failed to Respond (Code 11)"));
       break;
+    case ERROR_TIMEOUT:
+      chunked.print(F(" Response Timeout"));
+      break;
+    case ERROR_RTU:
+      chunked.print(F(" Invalid RTU Response"));
+      break;
+    case ERROR_TCP:
+      chunked.print(F(" Invalid TCP/UDP Request"));
+      break;
     default:
       break;
   }
@@ -630,8 +628,79 @@ void stringStats(ChunkedPrint &chunked, const byte stat) {
 }
 
 void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
-  unsigned long temp = 0;
   switch (JSONKEY) {
+#ifdef ENABLE_EXTRA_DIAG
+    case JSON_TIME:
+      chunked.print(seconds / (3600UL * 24L));
+      chunked.print(F(" days, "));
+      chunked.print((seconds / 3600UL) % 24L);
+      chunked.print(F(" hours, "));
+      chunked.print((seconds / 60UL) % 60L);
+      chunked.print(F(" mins, "));
+      chunked.print((seconds) % 60L);
+      chunked.print(F(" secs"));
+      break;
+    case JSON_RTU_DATA:
+      chunked.print(serialTxCount);
+      chunked.print(F(" Tx bytes / "));
+      chunked.print(serialRxCount);
+      chunked.print(F(" Rx bytes"));
+      break;
+    case JSON_ETH_DATA:
+      chunked.print(ethTxCount);
+      chunked.print(F(" Tx bytes / "));
+      chunked.print(ethRxCount);
+      chunked.print(F(" Rx bytes (excl. WebUI)"));
+      break;
+#endif /* ENABLE_EXTRA_DIAG */
+#ifdef TEST_SOCKS
+    case JSON_SOCKETS:
+      for (byte s = 0; s < maxSockNum; s++) {
+        chunked.print(W5100.readSnPORT(s));
+        chunked.print(F(" "));
+        chunked.print(hex(W5100.readSnSR(s)));
+        chunked.print(F(" "));
+        chunked.print(millis() - lastSocketUse[s]);
+        chunked.print(F("<br>"));
+      }
+      break;
+#endif
+    case JSON_RESPONSE:
+      {
+        for (byte i = 0; i < MAX_RESPONSE_LEN; i++) {
+          chunked.print(F("<input value='"));
+          if (i < responseLen) {
+            chunked.print(hex(response[i]));
+          }
+          chunked.print(F("' disabled class=i>"));
+        }
+        chunked.print(F("h"));
+        if (responseLen > MAX_RESPONSE_LEN) {
+          chunked.print(F(" +"));
+          chunked.print(byte(responseLen - MAX_RESPONSE_LEN));
+          chunked.print(F(" bytes"));
+        }
+      }
+      break;
+    case JSON_QUEUE:
+      chunked.print(queueDataSize);
+      chunked.print(F(" / "));
+      chunked.print(MAX_QUEUE_DATA);
+      chunked.print(F(" bytes<br>"));
+      chunked.print(queueHeadersSize);
+      chunked.print(F(" / "));
+      chunked.print(MAX_QUEUE_REQUESTS);
+      chunked.print(F(" requests"));
+      queueDataSize = queueData.size();
+      queueHeadersSize = queueHeaders.size();
+      break;
+    case JSON_STATS:
+      for (byte i = 0; i < ERROR_LAST; i++) {
+        if (i == SLAVE_ERROR_0B_QUEUE) continue;  // there is no counter for SLAVE_ERROR_0B_QUEUE
+        chunked.print(errorCount[i]);
+        stringStats(chunked, i);
+      }
+      break;
     case JSON_TCP_UDP_MASTERS:
       {
         for (byte s = 0; s < maxSockNum; s++) {
@@ -649,11 +718,11 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
           }
         }
       }
-      return;
+      break;
     case JSON_SLAVES:
       {
         for (byte k = 1; k < MAX_SLAVES; k++) {
-          for (byte s = 0; s < SLAVE_ERROR_LAST; s++) {
+          for (byte s = 0; s <= SLAVE_ERROR_0B_QUEUE; s++) {
             if (getSlaveStatus(k, s) == true || k == scanCounter) {
               chunked.print(hex(k));
               chunked.print(F("h"));
@@ -666,84 +735,8 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
           }
         }
       }
-      return;
-    case JSON_RESPONSE:
-      {
-        for (byte i = 0; i < MAX_RESPONSE_LEN; i++) {
-          chunked.print(F("<input value='"));
-          if (i < responseLen) {
-            chunked.print(hex(response[i]));
-          }
-          chunked.print(F("' disabled class=i>"));
-        }
-        chunked.print(F("h"));
-        if (responseLen > MAX_RESPONSE_LEN) {
-          chunked.print(F(" +"));
-          chunked.print(byte(responseLen - MAX_RESPONSE_LEN));
-          chunked.print(F(" bytes"));
-        }
-      }
-      return;
-#ifdef TEST_SOCKS
-    case JSON_SOCKETS:
-      for (byte s = 0; s < maxSockNum; s++) {
-        chunked.print(W5100.readSnPORT(s));
-        chunked.print(F(" "));
-        chunked.print(hex(W5100.readSnSR(s)));
-        chunked.print(F(" "));
-        chunked.print(millis() - lastSocketUse[s]);
-        chunked.print(F("<br>"));
-      }
-      return;
-#endif
-    case JSON_ERROR ... JSON_ERROR_3:
-      temp = errorCount[JSONKEY - JSON_ERROR];
       break;
-    case JSON_ERROR_TCP:
-      temp = errorTcpCount;
-      break;
-    case JSON_ERROR_RTU:
-      temp = errorRtuCount;
-      break;
-    case JSON_ERROR_TIMEOUT:
-      temp = errorTimeoutCount;
-      break;
-    case JSON_QUEUE_DATA:
-      temp = (unsigned long)queueDataSize;
-      queueDataSize = queueData.size();
-      break;
-    case JSON_QUEUE_REQUESTS:
-      temp = (unsigned long)queueHeadersSize;
-      queueHeadersSize = queueHeaders.size();
-      break;
-#ifdef ENABLE_EXTRA_DIAG
-    case JSON_SECS:
-      temp = (seconds) % 60L;
-      break;
-    case JSON_MINS:
-      temp = (seconds / 60UL) % 60L;
-      break;
-    case JSON_HOURS:
-      temp = (seconds / 3600UL) % 24L;
-      break;
-    case JSON_DAYS:
-      temp = seconds / (3600UL * 24L);
-      break;
-    case JSON_RTU_TX:
-      temp = serialTxCount;
-      break;
-    case JSON_RTU_RX:
-      temp = serialRxCount;
-      break;
-    case JSON_ETH_TX:
-      temp = ethTxCount;
-      break;
-    case JSON_ETH_RX:
-      temp = ethRxCount;
-      break;
-#endif /* ENABLE_EXTRA_DIAG */
     default:
       break;
   }
-  chunked.print(temp);
 }

@@ -102,26 +102,14 @@ byte requestLen = 0;                         // Length of the Modbus request sen
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
 enum JSON_type : byte {
-  JSON_SECS,   // Runtime seconds
-  JSON_MINS,   // Runtime minutes
-  JSON_HOURS,  // Runtime hours
-  JSON_DAYS,   // Runtime days
-  JSON_ERROR,  // Modbus status from array errorCount[STAT_ERROR_0B_QUEUE]
-  JSON_ERROR_1,
-  JSON_ERROR_2,
-  JSON_ERROR_3,
-  JSON_ERROR_TCP,
-  JSON_ERROR_RTU,
-  JSON_ERROR_TIMEOUT,
-  JSON_QUEUE_DATA,
-  JSON_QUEUE_REQUESTS,
+  JSON_TIME,   // Runtime seconds
+  JSON_RTU_DATA,
+  JSON_ETH_DATA,
+  JSON_RESPONSE,
+  JSON_STATS,  // Modbus statistics from array errorCount[]
+  JSON_QUEUE,
   JSON_TCP_UDP_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
   JSON_SLAVES,           // list of Modbus RTU slaves separated by <br>
-  JSON_RTU_TX,
-  JSON_RTU_RX,
-  JSON_ETH_TX,
-  JSON_ETH_RX,
-  JSON_RESPONSE,
   JSON_SOCKETS,
   JSON_LAST,  // Must be the very last element in this array
 };
@@ -362,7 +350,7 @@ void processPost(EthernetClient &client) {
       break;
     case SCAN:
       scanCounter = 1;
-      memset(&stat, 0, sizeof(stat));  // clear all status flags
+      memset(&slaveStatus, 0, sizeof(slaveStatus));  // clear all status flags
       break;
     case CLEAR_REQUEST:
       requestLen = 0;
@@ -390,7 +378,7 @@ void processPost(EthernetClient &client) {
   // new parameter values received, save them to EEPROM
   EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
 #ifdef ENABLE_DHCP
-  EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
+  EEPROM.put(CONFIG_START + 1 + sizeof(localConfig) + sizeof(errorCount), extraConfig);
 #endif
 }
 

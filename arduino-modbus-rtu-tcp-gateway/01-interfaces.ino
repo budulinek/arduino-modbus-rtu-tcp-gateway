@@ -88,7 +88,7 @@ void startEthernet() {
     digitalWrite(ETH_RESET_PIN, LOW);
     delay(25);
     digitalWrite(ETH_RESET_PIN, HIGH);
-    delay(500);
+    delay(ETH_RESET_DELAY);
   }
   byte mac[6];
   memcpy(mac, MAC_START, 3);               // set first 3 bytes
@@ -148,13 +148,10 @@ void maintainUptime() {
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const unsigned long ROLLOVER = 0xFFFFFF00;
-  for (byte i = 0; i < SLAVE_ERROR_0B_QUEUE; i++) {  // there is no counter for SLAVE_ERROR_0B_QUEUE
+  for (byte i = 0; i < ERROR_LAST; i++) {  // there is no counter for SLAVE_ERROR_0B_QUEUE
     if (errorCount[i] > ROLLOVER) {
       return true;
     }
-  }
-  if (errorTcpCount > ROLLOVER || errorRtuCount > ROLLOVER || errorTimeoutCount > ROLLOVER) {
-    return true;
   }
 #ifdef ENABLE_EXTRA_DIAG
   if (seconds > ROLLOVER) {
@@ -169,9 +166,7 @@ bool rollover() {
 
 void resetStats() {
   memset(errorCount, 0, sizeof(errorCount));
-  errorTcpCount = 0;
-  errorRtuCount = 0;
-  errorTimeoutCount = 0;
+  statsEepromTimer.sleep(0);
 #ifdef ENABLE_EXTRA_DIAG
   remaining_seconds = -(millis() / 1000);
   ethRxCount = 0;
@@ -195,10 +190,10 @@ void generateMac() {
 
 
 #if MAX_SOCK_NUM == 8
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };  // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #elif MAX_SOCK_NUM == 4
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };                          // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 #endif
 
@@ -356,7 +351,7 @@ ISR(WDT_vect) {
 #elif defined(__MK66FX1M0__)
 #define BOARD F("Teensy 3.6")
 #else
-#error "Unknown board"
+#define BOARD F("Unknown Board")
 #endif
 
 #else  // --------------- Arduino ------------------
@@ -412,7 +407,7 @@ ISR(WDT_vect) {
 #elif defined(ARDUINO_ARC32_TOOLS)
 #define BOARD F("Arduino 101")
 #else
-#error "Unknown board"
+#define BOARD F("Unknown Board")
 #endif
 
 #endif
