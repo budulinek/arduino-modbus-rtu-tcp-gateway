@@ -57,7 +57,7 @@ const byte SCAN_FUNCTION_FIRST = 0x03;               // Function code sent durin
 const byte SCAN_FUNCTION_SECOND = 0x04;              // Function code sent during Modbus RTU Scan request (second attempt)
 const byte SCAN_DATA_ADDRESS = 0x01;                 // Data address sent during Modbus RTU Scan request (both attempts)
 const int FETCH_INTERVAL = 2000;                     // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
-const unsigned int STATS_EEPROM_INTERVAL = 60;       // Interval (minutes) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
+const unsigned long STATS_EEPROM_INTERVAL = 60;       // Interval (minutes) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
 const byte MAX_RESPONSE_LEN = 16;                    // Max length (bytes) of the Modbus response shown in WebUI
 // List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
 const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
@@ -307,8 +307,8 @@ void loop() {
 
   manageSockets();
 
-  if (statsEepromTimer.isOver()) {
-    statsEepromTimer.sleep(STATS_EEPROM_INTERVAL * 60 * 1000);
+  if (statsEepromTimer.isOver() == true) {
+    statsEepromTimer.sleep(STATS_EEPROM_INTERVAL * 60UL * 1000UL * 1000UL);  // STATS_EEPROM_INTERVAL is in minutes, sleep is in microsecs!
     EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), errorCount);
   }
 
