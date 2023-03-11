@@ -46,10 +46,11 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - stored in EEPROM
   - retained during firmware upgrade (only in case of major version change, Arduino loads factory defaults)
   - all web interface inputs have proper validation
+  - factory defaults for user settings can be specified in advanced_settings.h
   - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
   - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
 * advanced settings:
-  - can be changed in sketch (see the initial section of arduino-modbus-rtu-tcp-gateway.ino)
+  - can be changed in sketch (advanced_settings.h)
   - stored in flash memory
 
 <img src="/pics/modbus1.png" alt="01" style="zoom:100%;" />

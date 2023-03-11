@@ -18,8 +18,7 @@
   v4.1 2023-01-14 Fetch API, bugfix MAX485
   v5.0 2023-02-19 Send Modbus Request from WebUI, optimized POST parameter processing (less RAM consumption), select baud rate in WebUI,
                   improved TCP socket management, Modbus TCP Idle Timeout settings
-  v6.0 2023-XX-XX Save error counters to EEPROM, code optimization
-
+  v6.0 2023-XX-XX Save error counters to EEPROM, code optimization, separate file for advanced settings
 */
 
 const byte VERSION[] = { 6, 0 };
@@ -36,40 +35,6 @@ const byte VERSION[] = { 6, 0 };
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <util/atomic.h>
-
-
-/****** ADVANCED SETTINGS ******/
-
-const byte MAX_QUEUE_REQUESTS = 10;                  // max number of TCP or UDP requests stored in a queue
-const int MAX_QUEUE_DATA = 256;                      // total length of TCP or UDP requests stored in a queue (in bytes)
-const byte MAX_SLAVES = 247;                         // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
-const int MODBUS_SIZE = 256;                         // size of a MODBUS RTU frame (determines size of various buffers)
-#define mySerial Serial                              // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
-#define RS485_CONTROL_PIN 6                          // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
-const byte ETH_RESET_PIN = 7;                        // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
-const unsigned int ETH_RESET_DELAY = 500;            // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
-const unsigned int WEB_IDLE_TIMEOUT = 400;           // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
-const unsigned int TCP_DISCON_TIMEOUT = 500;         // Timeout (ms) for client DISCON socket command, non-blocking alternative to https://www.arduino.cc/reference/en/libraries/ethernet/client.setconnectiontimeout/
-const unsigned int TCP_RETRANSMISSION_TIMEOUT = 50;  // Ethernet controller’s timeout (ms), blocking (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissiontimeout/)
-const byte TCP_RETRANSMISSION_COUNT = 3;             // Number of transmission attempts the Ethernet controller will make before giving up (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissioncount/)
-const unsigned int SCAN_TIMEOUT = 200;               // Timeout (ms) for Modbus scan requests
-const byte SCAN_FUNCTION_FIRST = 0x03;               // Function code sent during Modbus RTU Scan request (first attempt)
-const byte SCAN_FUNCTION_SECOND = 0x04;              // Function code sent during Modbus RTU Scan request (second attempt)
-const byte SCAN_DATA_ADDRESS = 0x01;                 // Data address sent during Modbus RTU Scan request (both attempts)
-const int FETCH_INTERVAL = 2000;                     // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
-const byte EEPROM_INTERVAL = 6;                      // Interval (hours) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
-const byte MAX_RESPONSE_LEN = 16;                    // Max length (bytes) of the Modbus response shown in WebUI
-// List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
-const unsigned int BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
-
-/****** EXTRA FUNCTIONS ******/
-
-// these do not fit into the limited flash memory of Arduino Uno/Nano, uncomment if you have a board with more memory
-// #define ENABLE_DHCP        // Enable DHCP (Auto IP settings)
-// #define ENABLE_EXTRA_DIAG  // Enable Ethernet and Serial byte counter.
-// #define TEST_SOCKS        // shows 1) port, 2) status and 3) age for all sockets in "Modbus Status" page. IP settings are not available.
-
-/****** DEFAULT FACTORY SETTINGS ******/
 
 typedef struct {
   byte macEnd[3];
@@ -90,36 +55,8 @@ typedef struct {
   byte serialAttempts;
 } config_type;
 
-/*
-  Please note that after boot, Arduino loads settings stored in EEPROM, even if you flash new program to it!
-
-  Arduino loads factory defaults specified bellow in case:
-  1) User clicks "Restore" defaults in WebUI (factory reset configuration, keeps MAC)
-  2) VERSION_MAJOR changes (factory reset configuration AND generates new MAC)
-*/
-
-const config_type DEFAULT_CONFIG = {
-  {},                    // macEnd (last 3 bytes)
-  { 192, 168, 1, 254 },  // ip
-  { 255, 255, 255, 0 },  // subnet
-  { 192, 168, 1, 1 },    // gateway
-  { 192, 168, 1, 1 },    // dns
-  false,                 // enableDhcp
-  502,                   // tcpPort
-  502,                   // udpPort
-  80,                    // webPort
-  false,                 // enableRtuOverTcp
-  600,                   // tcpTimeout
-  96,                    // baud / 100
-  SERIAL_8E1,            // serialConfig (Modbus RTU default is 8E1, another frequently used option is 8N2)
-  150,                   // frameDelay
-  500,                   // serialTimeout
-  3                      // serialAttempts
-};
 // local configuration values (stored in RAM)
 config_type localConfig;
-// Start address where config is saved in EEPROM
-const int CONFIG_START = 96;
 
 typedef struct {
   byte tid[2];           // MBAP Transaction ID
@@ -129,6 +66,8 @@ typedef struct {
   byte requestType;      // TCP client who sent the request
   byte atts;             // attempts counter
 } header;
+
+#include "advanced_settings.h"
 
 // each request is stored in 3 queues (all queues are written to, read and deleted in sync)
 CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
@@ -147,8 +86,6 @@ byte maxSockNum = MAX_SOCK_NUM;
 #ifdef ENABLE_DHCP
 bool dhcpSuccess = false;
 #endif /* ENABLE_DHCP */
-
-const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };
 
 EthernetUDP Udp;
 EthernetServer modbusServer(DEFAULT_CONFIG.tcpPort);
