@@ -102,7 +102,7 @@ byte requestLen = 0;                         // Length of the Modbus request sen
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
 enum JSON_type : byte {
-  JSON_TIME,   // Runtime seconds
+  JSON_TIME,  // Runtime seconds
   JSON_RTU_DATA,
   JSON_ETH_DATA,
   JSON_RESPONSE,
@@ -188,7 +188,6 @@ void recvWeb(EthernetClient &client) {
   action = NONE;
 }
 
-
 // This function stores POST parameter values in localConfig.
 // Most changes are saved and applied immediatelly, some changes (IP settings, web server port, reboot) are saved but applied later after "please wait" page is sent.
 void processPost(EthernetClient &client) {
@@ -214,19 +213,19 @@ void processPost(EthernetClient &client) {
     if (*paramValue == '\0')
       continue;  // do not process POST parameter if there is no parameter value
     byte paramKeyByte = strToByte(paramKey);
-    unsigned int paramValueUint = atol(paramValue);  // TODO use atoi?
+    unsigned int paramValueUint = atol(paramValue);
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
         break;
 #ifdef ENABLE_DHCP
       case POST_DHCP:
         {
-          extraConfig.enableDhcp = byte(paramValueUint);
+          localConfig.enableDhcp = byte(paramValueUint);
         }
         break;
       case POST_DNS ... POST_DNS_3:
         {
-          extraConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
+          localConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
         }
         break;
 #endif /* ENABLE_DHCP */
@@ -328,7 +327,7 @@ void processPost(EthernetClient &client) {
       default:
         break;
     }
-  }  // while (point != NULL)
+  }
   switch (action) {
     case FACTORY:
       {
@@ -336,6 +335,7 @@ void processPost(EthernetClient &client) {
         memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
         localConfig = DEFAULT_CONFIG;
         memcpy(localConfig.macEnd, tempMac, 3);
+        resetStats();
         break;
       }
     case MAC:
@@ -376,10 +376,7 @@ void processPost(EthernetClient &client) {
     responseLen = 0;  // clear old Modbus Response from WebUI
   }
   // new parameter values received, save them to EEPROM
-  EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
-#ifdef ENABLE_DHCP
-  EEPROM.put(CONFIG_START + 1 + sizeof(localConfig) + sizeof(errorCount), extraConfig);
-#endif
+  updateEeprom();  // it is safe to call, only changed values (and changed error and data counters) are updated
 }
 
 // takes 2 chars, 1 char + null byte or 1 null byte

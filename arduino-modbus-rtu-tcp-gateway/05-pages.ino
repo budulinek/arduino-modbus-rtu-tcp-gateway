@@ -56,7 +56,6 @@ void sendPage(EthernetClient &client, byte reqPage) {
     return;
   }
   chunked.print(F("HTTP/1.1 200 OK\r\n"
-                  // "Connection: close\r\n"
                   "Content-Type: text/html\r\n"
                   "Transfer-Encoding: chunked\r\n"
                   "\r\n"));
@@ -187,7 +186,6 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F("</form>"));
   tagDivClose(chunked);  // close tags <div class=c> <div class=w>
   chunked.end();         // closing tags not required </body></html>
-  // client.stop();
 }
 
 
@@ -202,6 +200,10 @@ void contentInfo(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Microcontroller"));
   chunked.print(BOARD);
   tagButton(chunked, F("Reboot"), REBOOT);
+  tagDivClose(chunked);
+  tagLabelDiv(chunked, F("EEPROM Health"));
+  chunked.print(eepromWrites);
+  chunked.print(F(" Write Cycles"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Ethernet Chip"));
   switch (W5100.getChip()) {
@@ -219,6 +221,9 @@ void contentInfo(ChunkedPrint &chunked) {
       break;
   }
   tagDivClose(chunked);
+  tagLabelDiv(chunked, F("Ethernet Sockets"));
+  chunked.print(maxSockNum);
+  tagDivClose(chunked);
   tagLabelDiv(chunked, F("MAC Address"));
   byte macBuffer[6];
   W5100.getMACAddress(macBuffer);
@@ -231,7 +236,7 @@ void contentInfo(ChunkedPrint &chunked) {
 
 #ifdef ENABLE_DHCP
   tagLabelDiv(chunked, F("Auto IP"));
-  if (!extraConfig.enableDhcp) {
+  if (!localConfig.enableDhcp) {
     chunked.print(F("DHCP disabled"));
   } else if (dhcpSuccess == true) {
     chunked.print(F("DHCP successful"));
@@ -312,7 +317,7 @@ void contentIp(ChunkedPrint &chunked) {
                   "<input type=checkbox id=o name="));
   chunked.print(POST_DHCP, HEX);
   chunked.print(F(" onclick=g(this.checked) value=1"));
-  if (extraConfig.enableDhcp) chunked.print(F(" checked"));
+  if (localConfig.enableDhcp) chunked.print(F(" checked"));
   chunked.print(F(">Enable DHCP"));
   tagDivClose(chunked);
 #endif /* ENABLE_DHCP */
@@ -359,7 +364,7 @@ void contentIp(ChunkedPrint &chunked) {
     chunked.print(F("<input name="));
     chunked.print(POST_DNS + i, HEX);
     chunked.print(F(" class='p i' required maxlength=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
-    chunked.print(extraConfig.dns[i]);
+    chunked.print(localConfig.dns[i]);
     chunked.print(F(">"));
     if (i < 3) chunked.print(F("."));
   }
@@ -641,16 +646,29 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
       chunked.print(F(" secs"));
       break;
     case JSON_RTU_DATA:
-      chunked.print(serialTxCount);
-      chunked.print(F(" Tx bytes / "));
-      chunked.print(serialRxCount);
-      chunked.print(F(" Rx bytes"));
-      break;
+      for (byte i = 0; i < DATA_LAST; i++) {
+        chunked.print(rtuCount[i]);
+        switch (i) {
+          case DATA_TX:
+            chunked.print(F(" Tx bytes / "));
+            break;
+          case DATA_RX:
+            chunked.print(F(" Rx bytes"));
+            break;
+        }
+      }
     case JSON_ETH_DATA:
-      chunked.print(ethTxCount);
-      chunked.print(F(" Tx bytes / "));
-      chunked.print(ethRxCount);
-      chunked.print(F(" Rx bytes (excl. WebUI)"));
+      for (byte i = 0; i < DATA_LAST; i++) {
+        chunked.print(ethCount[i]);
+        switch (i) {
+          case DATA_TX:
+            chunked.print(F(" Tx bytes / "));
+            break;
+          case DATA_RX:
+            chunked.print(F(" Rx bytes (excl. WebUI)"));
+            break;
+        }
+      }
       break;
 #endif /* ENABLE_EXTRA_DIAG */
 #ifdef TEST_SOCKS
@@ -707,7 +725,6 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
           byte remoteIParray[4];
           W5100.readSnDIPR(s, remoteIParray);
           if (remoteIParray[0] != 0) {
-            // if (uint32_t(remoteIParray) != 0) {
             if (W5100.readSnSR(s) == SnSR::UDP) {
               chunked.print(IPAddress(remoteIParray));
               chunked.print(F(" UDP<br>"));

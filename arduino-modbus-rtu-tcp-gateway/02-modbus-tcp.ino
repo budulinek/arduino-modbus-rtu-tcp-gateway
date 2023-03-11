@@ -43,7 +43,7 @@ void recvUdp() {
   unsigned int msgLength = Udp.parsePacket();
   if (msgLength) {
 #ifdef ENABLE_EXTRA_DIAG
-    ethRxCount += msgLength;
+    ethCount[DATA_RX] += msgLength;
 #endif                               /* ENABLE_EXTRA_DIAG */
     byte inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
                                      // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address)..... no CRC
@@ -72,8 +72,8 @@ void recvUdp() {
       }
       Udp.endPacket();
 #ifdef ENABLE_EXTRA_DIAG
-      ethTxCount += 5;
-      if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+      ethCount[DATA_TX] += 5;
+      if (!localConfig.enableRtuOverTcp) ethCount[DATA_TX] += 4;
 #endif /* ENABLE_EXTRA_DIAG */
     }
   }
@@ -82,7 +82,7 @@ void recvUdp() {
 void recvTcp(EthernetClient &client) {
   unsigned int msgLength = client.available();
 #ifdef ENABLE_EXTRA_DIAG
-  ethRxCount += msgLength;
+  ethCount[DATA_RX] += msgLength;
 #endif                             /* ENABLE_EXTRA_DIAG */
   byte inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
   // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
@@ -113,8 +113,8 @@ void recvTcp(EthernetClient &client) {
     }
     client.write(outBuffer, i);
 #ifdef ENABLE_EXTRA_DIAG
-    ethTxCount += 5;
-    if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+    ethCount[DATA_TX] += 5;
+    if (!localConfig.enableRtuOverTcp) ethCount[DATA_TX] += 4;
 #endif /* ENABLE_EXTRA_DIAG */
   }
 }
@@ -215,13 +215,13 @@ void deleteRequest()  // delete request from queue
 }
 
 void clearQueue() {
-  queueHeaders.clear();  // <- eats memory!
+  queueHeaders.clear();
   queueData.clear();
   scanReqInQueue = false;
   priorityReqInQueue = false;
   memset(socketInQueue, 0, sizeof(socketInQueue));
   memset(slaveStatus[SLAVE_ERROR_0B_QUEUE], 0, sizeof(slaveStatus[SLAVE_ERROR_0B_QUEUE]));
-  sendTimer.sleep(0);
+  sendMicroTimer.sleep(0);
 }
 
 bool getSlaveStatus(const uint8_t slave, const byte status) {
