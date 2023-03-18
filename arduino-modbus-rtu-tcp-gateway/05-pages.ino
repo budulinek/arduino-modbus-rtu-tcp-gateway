@@ -195,11 +195,11 @@ void contentInfo(ChunkedPrint &chunked) {
   chunked.print(VERSION[0]);
   chunked.print(F("."));
   chunked.print(VERSION[1]);
-  tagButton(chunked, F("Load Default Settings"), FACTORY);
+  tagButton(chunked, F("Load Default Settings"), ACT_FACTORY);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Microcontroller"));
   chunked.print(BOARD);
-  tagButton(chunked, F("Reboot"), REBOOT);
+  tagButton(chunked, F("Reboot"), ACT_REBOOT);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("EEPROM Health"));
   chunked.print(eepromWrites);
@@ -231,7 +231,7 @@ void contentInfo(ChunkedPrint &chunked) {
     chunked.print(hex(macBuffer[i]));
     if (i < 5) chunked.print(F(":"));
   }
-  tagButton(chunked, F("Generate New MAC"), MAC);
+  tagButton(chunked, F("Generate New MAC"), ACT_MAC);
   tagDivClose(chunked);
 
 #ifdef ENABLE_DHCP
@@ -284,7 +284,7 @@ void contentStatus(ChunkedPrint &chunked) {
     chunked.print(F("'>"));
   }
   chunked.print(F("h (without CRC) <input type=submit value=Send>"));
-  tagButton(chunked, F("Clear"), CLEAR_REQUEST);
+  tagButton(chunked, F("Clear"), ACT_CLEAR_REQUEST);
   tagDivClose(chunked);
   chunked.print(F("</form><form method=post>"));
   tagLabelDiv(chunked, F("Modbus RTU Response"));
@@ -294,14 +294,14 @@ void contentStatus(ChunkedPrint &chunked) {
   tagSpan(chunked, JSON_QUEUE);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Statistics"));
-  tagButton(chunked, F("Reset Stats"), RESET_STATS);
+  tagButton(chunked, F("Reset Stats"), ACT_RESET_STATS);
   tagSpan(chunked, JSON_STATS);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Masters"));
   tagSpan(chunked, JSON_TCP_UDP_MASTERS);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Slaves"));
-  tagButton(chunked, F("Scan Slaves"), SCAN);
+  tagButton(chunked, F("Scan Slaves"), ACT_SCAN);
   tagSpan(chunked, JSON_SLAVES);
   tagDivClose(chunked);
 }

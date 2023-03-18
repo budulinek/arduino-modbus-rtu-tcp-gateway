@@ -59,7 +59,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Reboot**.
 
-**EEPROM Health**. Keeps track of EEPROM write cycles (persistent, never cleared during factory resets)
+**EEPROM Health**. Keeps track of EEPROM write cycles (this counter is persistent, never cleared during factory resets). Replace your Arduino once you reach 100 000 write cycles (with 6 hours EEPROM_INTERVAL you have more than 50 years lifespan).
 
 **Ethernet Sockets**. Max number of usable sockets. See Limitations bellow. One socket is reserved for Modbus UDP, remaining sockets are shared between Modbus TCP and WebUI.
 
@@ -165,11 +165,16 @@ Get the hardware (cheap clones from China are sufficient) and connect together:
       Rx0 <-> RO
       Pin 6 <-> DE,RE
 
-Here is my setup:
+Here is my HW setup:
 Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
 <img src="/pics/HW.jpg" alt="01" style="zoom:100%;" />
 
-Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
+You can either:
+- ** Download and flash my pre-compiled firmware** from "Releases".
+- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino.
+
+Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
+Enjoy :-)
 
 ## Where can I learn more about Modbus protocols?
 
@@ -206,7 +211,7 @@ The number of used sockets is determined (by the Ethernet.h library) based on mi
 
 #### Memory
 
-Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in the sketch.
+Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in advanced settings.
 
 ## Version history
 
