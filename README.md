@@ -30,7 +30,8 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - send Modbus request and recieve Modbus response
   - scan Modbus slaves on RS485 interface
   - queue (buffer) status
-  - error counts
+  - counters ("RTU Data", "Ethernet Data", "Modbus Statistics") are periodically saved to EEPROM (every 6 hours)
+  - unsigned longs are used, rollover of counters is synchronized
   - content of the Modbus Status page is updated in the background (fetch API), javascript alert is shown if connection is lost
 * optimized TCP socket management (web interface and Modbus TCP):
   - gateway always listens for new web and Modbus TCP connections
@@ -45,10 +46,11 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - stored in EEPROM
   - retained during firmware upgrade (only in case of major version change, Arduino loads factory defaults)
   - all web interface inputs have proper validation
+  - factory defaults for user settings can be specified in advanced_settings.h
   - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
   - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
 * advanced settings:
-  - can be changed in sketch (see the initial section of arduino-modbus-rtu-tcp-gateway.ino)
+  - can be changed in sketch (advanced_settings.h)
   - stored in flash memory
 
 <img src="/pics/modbus1.png" alt="01" style="zoom:100%;" />
@@ -56,6 +58,10 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 **Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
 
 **Reboot**.
+
+**EEPROM Health**. Keeps track of EEPROM write cycles (this counter is persistent, never cleared during factory resets). Replace your Arduino once you reach 100 000 write cycles (with 6 hours EEPROM_INTERVAL you have more than 50 years lifespan).
+
+**Ethernet Sockets**. Max number of usable sockets. See Limitations bellow. One socket is reserved for Modbus UDP, remaining sockets are shared between Modbus TCP and WebUI.
 
 **Generate New MAC**. Generate new MAC address. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are true random.
 
@@ -73,7 +79,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Requests Queue**. Monitors internal request queue (buffer). The limits for bytes and for the number of requests stored in the queue can be configured in advanced settings.
 
-**Modbus Statistics**. Counters for various errors. Insigned longs are used, rollover of counters is synchronized:
+**Modbus Statistics**.
 * **Slave Responded**. Slave responded with a valid Modbus RTU response within response timeout.
 * **Slave Responded with Error (Codes 1~8)**. Slave responded, but with an error. For the list of error codes see https://en.wikipedia.org/wiki/Modbus#Exception_responses.
 * **Gateway Overloaded (Code 10)**. Request queue is full (either the number of bytes stored or the number of requests stored). Request was dropped and the gateway responded with an error code 10.
@@ -148,21 +154,27 @@ Get the hardware (cheap clones from China are sufficient) and connect together:
 * **Arduino Nano, Uno or Mega** (and possibly other). On Mega you have to configure Serial in advanced settings in the sketch.
 * **W5100, W5200 or W5500 based Ethernet shield**. The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. !!! ENC28J60 will not work !!!
 * **TTL to RS485 module**:
-  - with hardware automatic flow control (recommended, available on Aliexpress)<br>
-      Arduino <-> Module<br>
-      Tx1 <-> Tx<br>
-      Rx0 <-> Rx
-  - with flow controlled by pin (such as MAX485 module)<br>
-      Arduino <-> MAX485<br>
-      Tx1 <-> DI<br>
-      Rx0 <-> RO<br>
+  - recommended: TTL to RS485 module with hardware automatic flow control (available on Aliexpress)<br>
+      Arduino <-> Module
+      Tx1 <-> Tx
+      Rx0 <-> Rx<br>
+      
+  - not recommended: MAX485 module with flow controlled by pin (works but is vulnerable to burn outs)<br>
+      Arduino <-> MAX485
+      Tx1 <-> DI
+      Rx0 <-> RO
       Pin 6 <-> DE,RE
 
-Here is my setup:
+Here is my HW setup:
 Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
 <img src="/pics/HW.jpg" alt="01" style="zoom:100%;" />
 
-Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino. Connect your Arduino to ethernet, connect your Modbus RTU slaves to MAX485 module. Use your web browser to access the web interface on default IP  http://192.168.1.254   Enjoy :-)
+You can either:
+- ** Download and flash my pre-compiled firmware** from "Releases".
+- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino.
+
+Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
+Enjoy :-)
 
 ## Where can I learn more about Modbus protocols?
 
@@ -199,7 +211,7 @@ The number of used sockets is determined (by the Ethernet.h library) based on mi
 
 #### Memory
 
-Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in the sketch.
+Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in advanced settings.
 
 ## Version history
 

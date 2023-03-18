@@ -54,29 +54,29 @@ void startSerial() {
 #endif                                             /* RS485_CONTROL_PIN */
 }
 
-// time to send 1 character over serial in microseconds
-unsigned long charTime() {
-  byte bits =                                                   // number of bits per character (11 in default Modbus RTU settings)
+// number of bits per character (11 in default Modbus RTU settings)
+byte bitsPerChar() {
+  byte bits =
     1 +                                                         // start bit
     (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
     (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
   if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
-  return (bits * 10000UL) / (unsigned long)localConfig.baud;
+  return bits;
 }
 
-// character timeout
+// character timeout in micros
 unsigned long charTimeOut() {
   if (localConfig.baud <= 192) {
-    return 1.5 * charTime();  // inter-character time-out should be 1,5T
+    return (15000UL * bitsPerChar()) / localConfig.baud;  // inter-character time-out should be 1,5T
   } else {
     return 750;
   }
 }
 
-// minimum frame delay
+// minimum frame delay in micros
 unsigned long frameDelay() {
   if (localConfig.baud <= 192) {
-    return 3.5 * charTime();  // inter-frame delay should be 3,5T
+    return (35000UL * bitsPerChar()) / localConfig.baud;  // inter-frame delay should be 3,5T
   } else {
     return 1750;  // 1750 μs
   }
@@ -88,17 +88,17 @@ void startEthernet() {
     digitalWrite(ETH_RESET_PIN, LOW);
     delay(25);
     digitalWrite(ETH_RESET_PIN, HIGH);
-    delay(500);
+    delay(ETH_RESET_DELAY);
   }
   byte mac[6];
   memcpy(mac, MAC_START, 3);               // set first 3 bytes
   memcpy(mac + 3, localConfig.macEnd, 3);  // set last 3 bytes
 #ifdef ENABLE_DHCP
-  if (extraConfig.enableDhcp) {
+  if (localConfig.enableDhcp) {
     dhcpSuccess = Ethernet.begin(mac);
   }
-  if (!extraConfig.enableDhcp || dhcpSuccess == false) {
-    Ethernet.begin(mac, localConfig.ip, extraConfig.dns, localConfig.gateway, localConfig.subnet);
+  if (!localConfig.enableDhcp || dhcpSuccess == false) {
+    Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
   }
 #else  /* ENABLE_DHCP */
   Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);  // No DNS
@@ -119,7 +119,7 @@ void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
-  if (extraConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
+  if (localConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
     uint8_t maintainResult = Ethernet.maintain();
     if (maintainResult == 1 || maintainResult == 3) {  // renew failed or rebind failed
       dhcpSuccess = false;
@@ -148,20 +148,19 @@ void maintainUptime() {
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const unsigned long ROLLOVER = 0xFFFFFF00;
-  for (byte i = 0; i < SLAVE_ERROR_0B_QUEUE; i++) {  // there is no counter for SLAVE_ERROR_0B_QUEUE
+  for (byte i = 0; i < ERROR_LAST; i++) {
     if (errorCount[i] > ROLLOVER) {
       return true;
     }
-  }
-  if (errorTcpCount > ROLLOVER || errorRtuCount > ROLLOVER || errorTimeoutCount > ROLLOVER) {
-    return true;
   }
 #ifdef ENABLE_EXTRA_DIAG
   if (seconds > ROLLOVER) {
     return true;
   }
-  if (serialTxCount > ROLLOVER || serialRxCount > ROLLOVER || ethTxCount > ROLLOVER || ethRxCount > ROLLOVER) {
-    return true;
+  for (byte i = 0; i < DATA_LAST; i++) {
+    if (rtuCount[i] > ROLLOVER || ethCount[i] > ROLLOVER) {
+      return true;
+    }
   }
 #endif /* ENABLE_EXTRA_DIAG */
   return false;
@@ -169,16 +168,12 @@ bool rollover() {
 
 void resetStats() {
   memset(errorCount, 0, sizeof(errorCount));
-  errorTcpCount = 0;
-  errorRtuCount = 0;
-  errorTimeoutCount = 0;
 #ifdef ENABLE_EXTRA_DIAG
   remaining_seconds = -(millis() / 1000);
-  ethRxCount = 0;
-  ethTxCount = 0;
-  serialRxCount = 0;
-  serialTxCount = 0;
+  memset(rtuCount, 0, sizeof(rtuCount));
+  memset(ethCount, 0, sizeof(ethCount));
 #endif /* ENABLE_EXTRA_DIAG */
+  updateEeprom();
 }
 
 void generateMac() {
@@ -192,13 +187,31 @@ void generateMac() {
   }
 }
 
-
+void updateEeprom() {
+  eepromTimer.sleep(EEPROM_INTERVAL * 60UL * 60UL * 1000UL);  // EEPROM_INTERVAL is in hours, sleep is in milliseconds!
+  eepromWrites++;                                             // we assume that at least some bytes are written to EEPROM during EEPROM.update or EEPROM.put
+  int address = CONFIG_START;
+  EEPROM.put(address, eepromWrites);
+  address += sizeof(eepromWrites);
+  EEPROM.put(address, VERSION[0]);
+  address += 1;
+  EEPROM.put(address, localConfig);
+  address += sizeof(localConfig);
+  EEPROM.put(address, errorCount);
+  address += sizeof(errorCount);
+#ifdef ENABLE_EXTRA_DIAG
+  EEPROM.put(address, rtuCount);
+  address += sizeof(rtuCount);
+  EEPROM.put(address, ethCount);
+  address += sizeof(ethCount);
+#endif /* ENABLE_EXTRA_DIAG */
+}
 
 #if MAX_SOCK_NUM == 8
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };  // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #elif MAX_SOCK_NUM == 4
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };                          // +rs 03Feb2019 - records last interaction involving each socket to enable detecting sockets unused for longest time period
+unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 #endif
 
@@ -356,7 +369,7 @@ ISR(WDT_vect) {
 #elif defined(__MK66FX1M0__)
 #define BOARD F("Teensy 3.6")
 #else
-#define BOARD F("Unknown board")
+#define BOARD F("Unknown Board")
 #endif
 
 #else  // --------------- Arduino ------------------
@@ -412,7 +425,7 @@ ISR(WDT_vect) {
 #elif defined(ARDUINO_ARC32_TOOLS)
 #define BOARD F("Arduino 101")
 #else
-#define BOARD F("Unknown board")
+#define BOARD F("Unknown Board")
 #endif
 
 #endif

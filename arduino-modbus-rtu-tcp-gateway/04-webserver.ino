@@ -24,16 +24,16 @@ const byte POST_SIZE = 24;  // a smaller buffer for single post parameter + key
 
 // Actions that need to be taken after saving configuration.
 enum action_type : byte {
-  NONE,
-  FACTORY,        // Load default factory settings (but keep MAC address)
-  MAC,            // Generate new random MAC
-  REBOOT,         // Reboot the microcontroller
-  RESET_ETH,      // Ethernet reset
-  RESET_SERIAL,   // Serial reset
-  SCAN,           // Initialize RTU scan
-  RESET_STATS,    // Reset Modbus Statistics
-  CLEAR_REQUEST,  // Clear Modbus Request form
-  WEB             // Restart webserver
+  ACT_NONE,
+  ACT_FACTORY,        // Load default factory settings (but keep MAC address)
+  ACT_MAC,            // Generate new random MAC
+  ACT_REBOOT,         // Reboot the microcontroller
+  ACT_RESET_ETH,      // Ethernet reset
+  ACT_RESET_SERIAL,   // Serial reset
+  ACT_SCAN,           // Initialize RTU scan
+  ACT_RESET_STATS,    // Reset Modbus Statistics
+  ACT_CLEAR_REQUEST,  // Clear Modbus Request form
+  ACT_WEB             // Restart webserver
 };
 enum action_type action;
 
@@ -102,26 +102,14 @@ byte requestLen = 0;                         // Length of the Modbus request sen
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
 enum JSON_type : byte {
-  JSON_SECS,   // Runtime seconds
-  JSON_MINS,   // Runtime minutes
-  JSON_HOURS,  // Runtime hours
-  JSON_DAYS,   // Runtime days
-  JSON_ERROR,  // Modbus status from array errorCount[STAT_ERROR_0B_QUEUE]
-  JSON_ERROR_1,
-  JSON_ERROR_2,
-  JSON_ERROR_3,
-  JSON_ERROR_TCP,
-  JSON_ERROR_RTU,
-  JSON_ERROR_TIMEOUT,
-  JSON_QUEUE_DATA,
-  JSON_QUEUE_REQUESTS,
+  JSON_TIME,  // Runtime seconds
+  JSON_RTU_DATA,
+  JSON_ETH_DATA,
+  JSON_RESPONSE,
+  JSON_STATS,  // Modbus statistics from array errorCount[]
+  JSON_QUEUE,
   JSON_TCP_UDP_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
   JSON_SLAVES,           // list of Modbus RTU slaves separated by <br>
-  JSON_RTU_TX,
-  JSON_RTU_RX,
-  JSON_ETH_TX,
-  JSON_ETH_RX,
-  JSON_RESPONSE,
   JSON_SOCKETS,
   JSON_LAST,  // Must be the very last element in this array
 };
@@ -163,7 +151,7 @@ void recvWeb(EthernetClient &client) {
     }
   }
   // Actions that require "please wait" page
-  if (action == WEB || action == MAC || action == RESET_ETH || action == REBOOT || action == FACTORY) {
+  if (action == ACT_WEB || action == ACT_MAC || action == ACT_RESET_ETH || action == ACT_REBOOT || action == ACT_FACTORY) {
     reqPage = PAGE_WAIT;
   }
   // Send page
@@ -172,7 +160,7 @@ void recvWeb(EthernetClient &client) {
   // Do all actions before the "please wait" redirects (5s delay at the moment)
   if (reqPage == PAGE_WAIT) {
     switch (action) {
-      case WEB:
+      case ACT_WEB:
         for (byte s = 0; s < maxSockNum; s++) {
           // close old webserver TCP connections
           if (EthernetClient(s).localPort() != localConfig.tcpPort) {
@@ -181,25 +169,24 @@ void recvWeb(EthernetClient &client) {
         }
         webServer = EthernetServer(localConfig.webPort);
         break;
-      case MAC:
-      case RESET_ETH:
+      case ACT_MAC:
+      case ACT_RESET_ETH:
         for (byte s = 0; s < maxSockNum; s++) {
           // close all TCP and UDP sockets
           disconSocket(s);
         }
         startEthernet();
         break;
-      case REBOOT:
-      case FACTORY:
+      case ACT_REBOOT:
+      case ACT_FACTORY:
         resetFunc();
         break;
       default:
         break;
     }
   }
-  action = NONE;
+  action = ACT_NONE;
 }
-
 
 // This function stores POST parameter values in localConfig.
 // Most changes are saved and applied immediatelly, some changes (IP settings, web server port, reboot) are saved but applied later after "please wait" page is sent.
@@ -226,19 +213,19 @@ void processPost(EthernetClient &client) {
     if (*paramValue == '\0')
       continue;  // do not process POST parameter if there is no parameter value
     byte paramKeyByte = strToByte(paramKey);
-    unsigned int paramValueUint = atol(paramValue);  // TODO use atoi?
+    unsigned int paramValueUint = atol(paramValue);
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
         break;
 #ifdef ENABLE_DHCP
       case POST_DHCP:
         {
-          extraConfig.enableDhcp = byte(paramValueUint);
+          localConfig.enableDhcp = byte(paramValueUint);
         }
         break;
       case POST_DNS ... POST_DNS_3:
         {
-          extraConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
+          localConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
         }
         break;
 #endif /* ENABLE_DHCP */
@@ -250,7 +237,7 @@ void processPost(EthernetClient &client) {
         break;
       case POST_IP ... POST_IP_3:
         {
-          action = RESET_ETH;  // this RESET_ETH is triggered when the user changes anything on the "IP Settings" page.
+          action = ACT_RESET_ETH;  // this RESET_ETH is triggered when the user changes anything on the "IP Settings" page.
           // No need to trigger RESET_ETH for other cases (POST_SUBNET, POST_GATEWAY etc.)
           localConfig.ip[paramKeyByte - POST_IP] = byte(paramValueUint);
         }
@@ -289,7 +276,7 @@ void processPost(EthernetClient &client) {
         {
           if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from Modbus TCP port
             localConfig.webPort = paramValueUint;
-            action = WEB;
+            action = ACT_WEB;
           }
         }
         break;
@@ -301,7 +288,7 @@ void processPost(EthernetClient &client) {
         break;
       case POST_BAUD:
         {
-          action = RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
+          action = ACT_RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
           // No need to trigger RESET_ETH for other cases (POST_DATA, POST_PARITY etc.)
           localConfig.baud = paramValueUint;
           byte minFrameDelay = byte((frameDelay() / 1000UL) + 1);
@@ -340,31 +327,32 @@ void processPost(EthernetClient &client) {
       default:
         break;
     }
-  }  // while (point != NULL)
+  }
   switch (action) {
-    case FACTORY:
+    case ACT_FACTORY:
       {
         byte tempMac[3];
         memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
         localConfig = DEFAULT_CONFIG;
         memcpy(localConfig.macEnd, tempMac, 3);
+        resetStats();
         break;
       }
-    case MAC:
+    case ACT_MAC:
       generateMac();
       break;
-    case RESET_STATS:
+    case ACT_RESET_STATS:
       resetStats();
       break;
-    case RESET_SERIAL:
+    case ACT_RESET_SERIAL:
       clearQueue();
       startSerial();
       break;
-    case SCAN:
+    case ACT_SCAN:
       scanCounter = 1;
-      memset(&stat, 0, sizeof(stat));  // clear all status flags
+      memset(&slaveStatus, 0, sizeof(slaveStatus));  // clear all status flags
       break;
-    case CLEAR_REQUEST:
+    case ACT_CLEAR_REQUEST:
       requestLen = 0;
       responseLen = 0;
       break;
@@ -388,10 +376,7 @@ void processPost(EthernetClient &client) {
     responseLen = 0;  // clear old Modbus Response from WebUI
   }
   // new parameter values received, save them to EEPROM
-  EEPROM.put(CONFIG_START + 1, localConfig);  // it is safe to call, only changed values are updated
-#ifdef ENABLE_DHCP
-  EEPROM.put(CONFIG_START + 1 + sizeof(localConfig), extraConfig);
-#endif
+  updateEeprom();  // it is safe to call, only changed values (and changed error and data counters) are updated
 }
 
 // takes 2 chars, 1 char + null byte or 1 null byte

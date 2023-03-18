@@ -18,7 +18,7 @@
 
 
 void sendSerial() {
-  if (!sendTimer.isOver()) {
+  if (!sendMicroTimer.isOver()) {
     return;
   }
   if (queueHeaders.isEmpty()) {
@@ -62,7 +62,7 @@ void sendSerial() {
           txNdx = 0;
           mySerial.flush();
 #ifdef RS485_CONTROL_PIN
-          // sendTimer.sleep(frameDelay());  // Short delay before we toggle the RS485_CONTROL_PIN and disable RS485 transmit. Not needed if we use flush()
+          // sendMicroTimer.sleep(frameDelay());  // Short delay before we toggle the RS485_CONTROL_PIN and disable RS485 transmit. Not needed if we use flush()
 #endif /* RS485_CONTROL_PIN */
           serialState++;
         }
@@ -71,8 +71,8 @@ void sendSerial() {
     case 2:  // DELAY:
       {
 #ifdef ENABLE_EXTRA_DIAG
-        serialTxCount += myHeader.msgLen;
-        serialTxCount += 2;
+        rtuCount[DATA_TX] += myHeader.msgLen;
+        rtuCount[DATA_TX] += 2;
 #endif
 #ifdef RS485_CONTROL_PIN
         digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Disable RS485 Transmit
@@ -82,7 +82,7 @@ void sendSerial() {
         queueHeaders.unshift(myHeader);
         unsigned long delay = localConfig.serialTimeout;
         if (myHeader.requestType & SCAN_REQUEST) delay = SCAN_TIMEOUT;  // fixed timeout for scan requests
-        sendTimer.sleep(delay * 1000UL);
+        sendMicroTimer.sleep(delay * 1000UL);
         serialState++;
       }
       break;
@@ -109,10 +109,10 @@ void sendSerial() {
           PDU[3] = lowByte(crc);  // send CRC, low byte first
           PDU[4] = highByte(crc);
           sendResponse(MBAP, PDU, 5);
-          errorTimeoutCount++;
+          errorCount[ERROR_TIMEOUT]++;
         } else {
           setSlaveStatus(queueData[0], SLAVE_ERROR_0B_QUEUE, true, false);
-          errorTimeoutCount++;
+          errorCount[ERROR_TIMEOUT]++;
         }                 // if (myHeader.atts >= MAX_RETRY)
         serialState = 0;  // IDLE
       }
@@ -130,11 +130,11 @@ void recvSerial() {
     if (rxNdx < MODBUS_SIZE) {
       serialIn[rxNdx] = b;
       rxNdx++;
-    }  // if frame longer than maximum allowed, CRC will fail and errorRtuCount will be recorded down the road
-    recvTimer.sleep(charTimeOut());
-    sendTimer.sleep(localConfig.frameDelay * 1000UL);  // delay next serial write
+    }  // if frame longer than maximum allowed, CRC will fail and errorCount[ERROR_RTU] will be recorded down the road
+    recvMicroTimer.sleep(charTimeOut());
+    sendMicroTimer.sleep(localConfig.frameDelay * 1000UL);  // delay next serial write
   }
-  if (recvTimer.isOver() && rxNdx != 0) {
+  if (recvMicroTimer.isOver() && rxNdx != 0) {
     // Process Serial data
     // Checks: 1) CRC; 2) address of incoming packet against first request in queue; 3) only expected responses are forwarded to TCP/UDP
     header myHeader = queueHeaders.first();
@@ -155,10 +155,10 @@ void recvSerial() {
       sendResponse(MBAP, serialIn, rxNdx);
       serialState = IDLE;
     } else {
-      errorRtuCount++;
+      errorCount[ERROR_RTU]++;
     }
 #ifdef ENABLE_EXTRA_DIAG
-    serialRxCount += rxNdx;
+    rtuCount[DATA_RX] += rxNdx;
 #endif /* ENABLE_EXTRA_DIAG */
     rxNdx = 0;
   }
@@ -182,25 +182,24 @@ void sendResponse(const byte MBAP[], const byte PDU[], const int pduLength) {
     }
     Udp.endPacket();
 #ifdef ENABLE_EXTRA_DIAG
-    ethTxCount += pduLength;
-    if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+    ethCount[DATA_TX] += pduLength;
+    if (!localConfig.enableRtuOverTcp) ethCount[DATA_TX] += 4;
 #endif /* ENABLE_EXTRA_DIAG */
   } else if (myHeader.requestType & TCP_REQUEST) {
     byte sock = myHeader.requestType & TCP_REQUEST_MASK;
     EthernetClient client = EthernetClient(sock);
-    //    if (W5100.readSnSR(sock) == SnSR::ESTABLISHED && W5100.readSnDPORT(sock) == myHeader.remPort) {  // Check remote port should be enough or check also rem IP?
-    if (W5100.readSnSR(sock) == SnSR::ESTABLISHED) {  // Check remote port should be enough or check also rem IP?
+    if (W5100.readSnSR(sock) == SnSR::ESTABLISHED && W5100.readSnDPORT(sock) == myHeader.remPort) {  // Check remote port should be enough or check also rem IP?
       if (localConfig.enableRtuOverTcp) client.write(PDU, pduLength);
       else {
         client.write(MBAP, 6);
         client.write(PDU, pduLength - 2);  //send without CRC
       }
 #ifdef ENABLE_EXTRA_DIAG
-      ethTxCount += pduLength;
-      if (!localConfig.enableRtuOverTcp) ethTxCount += 4;
+      ethCount[DATA_TX] += pduLength;
+      if (!localConfig.enableRtuOverTcp) ethCount[DATA_TX] += 4;
 #endif /* ENABLE_EXTRA_DIAG */
     }  // TODO TCP Connection Error
-  }    // else SCAN_REQUEST (no ethTxCount, but yes delete request)
+  }    // else SCAN_REQUEST (no ethCount[DATA_TX], but yes delete request)
   deleteRequest();
 }
 
