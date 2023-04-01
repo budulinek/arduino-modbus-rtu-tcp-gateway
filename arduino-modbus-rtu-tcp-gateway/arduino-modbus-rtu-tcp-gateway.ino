@@ -19,6 +19,7 @@
   v5.0 2023-02-19 Send Modbus Request from WebUI, optimized POST parameter processing (less RAM consumption), select baud rate in WebUI,
                   improved TCP socket management, Modbus TCP Idle Timeout settings
   v6.0 2023-03-18 Save error counters to EEPROM, code optimization, separate file for advanced settings
+  v6.1 2023-XX-XX Code optimization
 */
 
 const byte VERSION[] = { 6, 0 };
