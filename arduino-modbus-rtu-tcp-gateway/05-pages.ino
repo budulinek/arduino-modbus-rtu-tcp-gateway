@@ -374,37 +374,25 @@ void contentIp(ChunkedPrint &chunked) {
 
 //            TCP/UDP Settings
 void contentTcp(ChunkedPrint &chunked) {
+  unsigned int value;
   for (byte i = 0; i < 3; i++) {
     switch (i) {
       case 0:
         tagLabelDiv(chunked, F("Modbus TCP Port"));
+        value = localConfig.tcpPort;
         break;
       case 1:
         tagLabelDiv(chunked, F("Modbus UDP Port"));
+        value = localConfig.udpPort;
         break;
       case 2:
         tagLabelDiv(chunked, F("WebUI Port"));
+        value = localConfig.webPort;
         break;
       default:
         break;
     }
-    tagInputNumber(chunked);
-    chunked.print(POST_TCP + i, HEX);
-    chunked.print(F(" min=1 max=65535 value="));
-    switch (i) {
-      case 0:
-        chunked.print(localConfig.tcpPort);
-        break;
-      case 1:
-        chunked.print(localConfig.udpPort);
-        break;
-      case 2:
-        chunked.print(localConfig.webPort);
-        break;
-      default:
-        break;
-    }
-    chunked.print(F(">"));
+    tagInputNumber(chunked, POST_TCP + i, 1, 65535, value, F(""));
     tagDivClose(chunked);
   }
   tagLabelDiv(chunked, F("Modbus Mode"));
@@ -431,11 +419,7 @@ void contentTcp(ChunkedPrint &chunked) {
   chunked.print(F("</select>"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus TCP Idle Timeout"));
-  tagInputNumber(chunked);
-  chunked.print(POST_TCP_TIMEOUT, HEX);
-  chunked.print(F(" min=1 max=3600 value="));
-  chunked.print(localConfig.tcpTimeout);
-  chunked.print(F("> (1~3600) sec"));
+  tagInputNumber(chunked, POST_TCP_TIMEOUT, 1, 3600, localConfig.tcpTimeout, F("sec"));
   tagDivClose(chunked);
 }
 
@@ -511,30 +495,13 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("</select> bit"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Inter-frame Delay"));
-  tagInputNumber(chunked);
-  chunked.print(POST_FRAMEDELAY, HEX);
-  chunked.print(F(" min="));
-  byte minFrameDelay = byte(frameDelay() / 1000UL) + 1;
-  chunked.print(minFrameDelay);
-  chunked.print(F(" max=250 value="));
-  chunked.print(localConfig.frameDelay);
-  chunked.print(F("> ("));
-  chunked.print(minFrameDelay);
-  chunked.print(F("~250) ms"));
+  tagInputNumber(chunked, POST_FRAMEDELAY, byte(frameDelay() / 1000UL) + 1, 250, localConfig.frameDelay, F("ms"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Response Timeout"));
-  tagInputNumber(chunked);
-  chunked.print(POST_TIMEOUT, HEX);
-  chunked.print(F(" min=50 max=5000 value="));
-  chunked.print(localConfig.serialTimeout);
-  chunked.print(F("> (50~5000) ms"));
+  tagInputNumber(chunked, POST_TIMEOUT, 50, 5000, localConfig.serialTimeout, F("ms"));
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Attempts"));
-  tagInputNumber(chunked);
-  chunked.print(POST_ATTEMPTS, HEX);
-  chunked.print(F(" min=1 max=5 value="));
-  chunked.print(localConfig.serialAttempts);
-  chunked.print(F("> (1~5)"));
+  tagInputNumber(chunked, POST_ATTEMPTS, 1, 5, localConfig.serialAttempts, F(""));
   tagDivClose(chunked);
 }
 
@@ -544,23 +511,37 @@ void contentWait(ChunkedPrint &chunked) {
 }
 
 // Functions providing snippets of repetitive HTML code
-void tagInputNumber(ChunkedPrint &chunked) {
+
+void tagInputNumber(ChunkedPrint &chunked, const byte name, const byte min, unsigned int max, unsigned int value, const __FlashStringHelper *units) {
   chunked.print(F("<input class='s n' required type=number name="));
+  chunked.print(name, HEX);
+  chunked.print(F(" min="));
+  chunked.print(min);
+  chunked.print(F(" max="));
+  chunked.print(max);
+  chunked.print(F(" value="));
+  chunked.print(value);
+  chunked.print(F("> ("));
+  chunked.print(min);
+  chunked.print(F("~"));
+  chunked.print(max);
+  chunked.print(F(") "));
+  chunked.print(units);
 }
 
-void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *flashString) {
+void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
   chunked.print(F("<div class=r>"
                   "<label>"));
-  chunked.print(flashString);
+  chunked.print(label);
   chunked.print(F(":</label>"
                   "<div>"));
 }
 
-void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, byte action) {
+void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, byte value) {
   chunked.print(F(" <button name="));
   chunked.print(POST_ACTION, HEX);
   chunked.print(F(" value="));
-  chunked.print(action);
+  chunked.print(value);
   chunked.print(F(">"));
   chunked.print(flashString);
   chunked.print(F("</button><br>"));
