@@ -273,4 +273,4 @@ Big thanks to the authors of these libraries and tutorials!
 
 # Version History
 
-For version history see [arduino-modbus-rtu-tcp-gateway.ino](arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino)
+For version history see [arduino-modbus-rtu-tcp-gateway.ino](arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino#L3)
