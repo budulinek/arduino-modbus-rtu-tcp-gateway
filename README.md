@@ -130,7 +130,7 @@ Enjoy :-)
 
 **Modbus Statistics**.
 * **Slave Responded**. Slave responded with a valid Modbus RTU response within response timeout.
-* **Slave Responded with Error (Codes 1~8)**. Slave responded, but with an error. For the list of error codes see https://en.wikipedia.org/wiki/Modbus#Exception_responses.
+* **Slave Responded with Error (Codes 1~8)**. Slave responded, but with an error. For the list of error codes see [Wikipedia](https://en.wikipedia.org/wiki/Modbus#Exception_responses target="_blank" rel="noopener").
 * **Gateway Overloaded (Code 10)**. Request queue is full (either the number of bytes stored or the number of requests stored). Request was dropped and the gateway responded with an error code 10.
 * **Slave Failed to Respond (Code 11)**. Slave is not responding. Response timeouts have passed, all attempts have failed. The gateway responded with an error code 11.
 * **Invalid TCP/UDP Request**. Invalid request was received via TCP or UDP. Request was dropped, no response was sent by the gateway. Validation criteria depends on the Modbus mode:
