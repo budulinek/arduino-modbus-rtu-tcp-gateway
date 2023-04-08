@@ -9,6 +9,14 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
   - [System Info](#system-info)
   - [Modbus Status](#modbus-status)
   - [IP Settings](#ip-settings)
+  - [TCP/UDP Settings](#tcpudp-settings)
+  - [RTU Settings](#rtu-settings)
+* [Integration](#integration)
+  - [Loxone](#loxone)
+  - [Home Assistant](#home-assistant)
+  - [OpenHAB](#openhab)
+  - [Node-RED](#node-red)
+* 
 
 # What is it good for?
 
@@ -230,28 +238,7 @@ Supports Modbus TCP. Import and configure the **[node-red-contrib-modbus](https:
 * an intermediary between the Modbus gateway and other home automation system
 * an intermediary between the Modbus gateway and a time series database and visualisation tool (InfluxDB + Grafana)
 
-
-# Where can I learn more about Modbus protocols?
-
-https://en.wikipedia.org/wiki/Modbus
-
-https://modbus.org/specs.php
-
-http://www.simplymodbus.ca/FAQ.htm
-
-# Can I use just the web interface for my own project?
-Feel free to use this sketch as a template for a web interface within your own project. Look into the main file (arduino-modbus-rtu-tcp-gateway.ino) for how settings are stored in and loaded from EEPROM during boot. Ethernet interface and Webserver is started via function in 01-interfaces.ino. All other functions related to the web server (reading from clients, sending pages to clients) can be found in separate files (04-webserver.ino , 05-pages.ino ). Feel free to adjust them.
-
-The key to success is:
-
-* use StreamLib https://github.com/jandrassy/StreamLib
-* use F macros for your HTML code
-* use for() loop or dedicated functions for repetitive code
-* use POST method (rather than GET) for your webforms, see this tutorial https://werner.rothschopf.net/202003_arduino_webserver_post_en.htm
-
-Big thanks to the authors of these libraries and tutorials!
-
-# Limitations and Known  Issues
+# Limitations and Known Issues
 
 ## Portability
 
@@ -267,6 +254,20 @@ The number of used sockets is determined (by the Ethernet.h library) based on mi
 ## Memory
 
 Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in advanced settings.
+
+# Links and Credits
+
+https://en.wikipedia.org/wiki/Modbus
+
+https://modbus.org/specs.php
+
+http://www.simplymodbus.ca/FAQ.htm
+
+https://github.com/jandrassy/StreamLib
+
+https://werner.rothschopf.net/202003_arduino_webserver_post_en.htm
+
+Big thanks to the authors of these libraries and tutorials!
 
 # Version history
 
