@@ -22,9 +22,7 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
 
 # What is it good for?
 
-Allows you to connect your Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as monitoring systems, home automation systems). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap TTL to RS485 module) can do the job!
-
-Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via web interface (settings are automatically stored in EEPROM).
+Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC devices) to monitoring systems and home automation systems (such as Loxone, Home Assistant, OpenHAB and other). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap TTL to RS485 module) can do the job! You can easily change settings of your Arduino Modbus gateway via web interface, your settings are automatically stored in EEPROM.
 
 # Technical specifications
 
