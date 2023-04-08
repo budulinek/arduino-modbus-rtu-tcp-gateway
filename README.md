@@ -3,14 +3,20 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
 
 * [What is it good for?](#what-is-it-good-for)
 * [Technical specifications](#technical-specifications)
+* [Hardware](#hardware)
+* [Firmware](#firmware)
+* [Settings](#settings)
+  - [System Info](#system-info)
+  - [Modbus Status](#modbus-status)
+  - [IP Settings](#ip-settings)
 
-## What is it good for?
+# What is it good for?
 
 Allows you to connect your Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as monitoring systems, home automation systems). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap TTL to RS485 module) can do the job!
 
 Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via web interface (settings are automatically stored in EEPROM).
 
-## Technical specifications
+# Technical specifications
 
 * slaves are connected via RS485 interface:
   - up to 247 Modbus RTU slaves
@@ -56,7 +62,38 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - can be changed in sketch (advanced_settings.h)
   - stored in flash memory
 
-<img src="/pics/modbus1.png" alt="01" style="zoom:100%;" />
+# Hardware
+Get the hardware (cheap clones from China are sufficient) and connect together:
+
+* **Arduino Nano, Uno or Mega** (and possibly other). On Mega you have to configure Serial in advanced settings in the sketch.
+* **W5100, W5200 or W5500 based Ethernet shield**. The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. !!! ENC28J60 will not work !!!
+* **TTL to RS485 module**:
+  - recommended: TTL to RS485 module with hardware automatic flow control (available on Aliexpress)<br>
+      Arduino <-> Module
+      Tx1 <-> Tx
+      Rx0 <-> Rx<br>
+      
+  - not recommended: MAX485 module with flow controlled by pin (works but is vulnerable to burn outs)<br>
+      Arduino <-> MAX485
+      Tx1 <-> DI
+      Rx0 <-> RO
+      Pin 6 <-> DE,RE
+
+Here is my HW setup:
+Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn, no longer available) + TTL to RS485 module (HW automatic flow control)
+<img src="pics/HW.jpg" alt="01" style="zoom:100%;" />
+
+# Firmware
+
+You can either:
+- ** Download and flash my pre-compiled firmware** from "Releases".
+- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino.
+
+Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
+Enjoy :-)
+# Settings
+## System Info
+<img src="pics/modbus1.png" alt="01" style="zoom:100%;" />
 
 **Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
 
@@ -68,6 +105,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Generate New MAC**. Generate new MAC address. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are true random.
 
+## Modbus Status
 <img src="pics/modbus2.png" alt="02" style="zoom:100%;" />
 
 **Modbus RTU Request**. Send a Modbus RTU request directly from web UI. First byte (slave address) and second byte (function code) are mandatory, no need to calculate CRC. Gateway remembers last request for your convenience.
@@ -110,7 +148,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - fixed response timeout (very short, configured in advanced settings), only one attempt
   - gateway marks the slave as "Slave Responded" if any response is sent by the slave (even error)
 
-
+## IP Settings
 <img src="pics/modbus3.png" alt="03" style="zoom:100%;" />
 
 **Auto IP**.\* Once enabled, Arduino will receive IP, gateway, subnet and DNS from the DHCP server.
@@ -123,6 +161,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **DNS**.\*
 
+## TCP/UDP Settings
 <img src="pics/modbus4.png" alt="04" style="zoom:100%;" />
 
 **Modbus TCP Port**.
@@ -135,6 +174,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Modbus TCP Idle Timeout**. Amount of time that a connection is always held alive (open) with no incoming traffic from a Modbus TCP master. This timeout should be longer than polling period (scan rate) set on your Modbus TCP master device.
 
+## RTU Settings
 <img src="pics/modbus5.png" alt="05" style="zoom:100%;" />
 
 **Baud Rate**. Choose baud rate from a pre-aranged list. The list can be adjusted in advanced settings.
@@ -151,39 +191,11 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Attempts**. Number of attempts before error (Code 11) is sent back to the Modbus TCP/UDP master.
 
-## How can I build it myself?
-Get the hardware (cheap clones from China are sufficient) and connect together:
-
-* **Arduino Nano, Uno or Mega** (and possibly other). On Mega you have to configure Serial in advanced settings in the sketch.
-* **W5100, W5200 or W5500 based Ethernet shield**. The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. !!! ENC28J60 will not work !!!
-* **TTL to RS485 module**:
-  - recommended: TTL to RS485 module with hardware automatic flow control (available on Aliexpress)<br>
-      Arduino <-> Module
-      Tx1 <-> Tx
-      Rx0 <-> Rx<br>
-      
-  - not recommended: MAX485 module with flow controlled by pin (works but is vulnerable to burn outs)<br>
-      Arduino <-> MAX485
-      Tx1 <-> DI
-      Rx0 <-> RO
-      Pin 6 <-> DE,RE
-
-Here is my HW setup:
-Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
-<img src="pics/HW.jpg" alt="01" style="zoom:100%;" />
-
-You can either:
-- ** Download and flash my pre-compiled firmware** from "Releases".
-- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino.
-
-Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
-Enjoy :-)
-
-## Integration
+# Integration
 
 This gateway adheres to the Modbus protocol specifications, so you can use it to connect any compliant Modbus RTU slave (Modbus device) with any compliant Modbus  TCP/UDP master (such as home automation system). Here is a quick overview how you can integrate the gateway into the most popular home automation systems:
 
-### Loxone
+## Loxone
 
 Loxone Miniserver (both the current Miniserver and the old Miniserver Gen. 1) supports:
 * Modbus TCP (through **Modbus Server**)
@@ -203,34 +215,23 @@ Please note that the implementation of Modbus RTU (= Loxone Modbus Extension) an
 
 **Modbus UDP**. If you want to avoid the above mentioned limitations, you can use Modbus UDP as a communication protocol between Loxone and this Arduino Modbus gateway. See [Loxone_ModbusUDP.md](Loxone_ModbusUDP.md) on how to implement Modbus UDP in Loxone with **Virtual UDP output** and **Virtual UDP input**.
 
-### Home Assistant
+## Home Assistant
 
-Supports:
-* Modbus TCP
-* Modbus UDP
-* Modbus RTU over TCP
+Supports Modbus TCP, Modbus UDP, Modbus RTU over TCP. Follow this **[official tutorial](https://www.home-assistant.io/integrations/modbus/)**.
 
-Follow this **[official tutorial](https://www.home-assistant.io/integrations/modbus/)**.
+## OpenHAB
 
-### OpenHAB
+Supports Modbus TCP. Follow this **[official tutorial](https://www.openhab.org/addons/bindings/modbus/)**.
 
-Supports:
-* Modbus TCP
+## Node-RED
 
-Follow this **[official tutorial](https://www.openhab.org/addons/bindings/modbus/)**.
-
-### Node-RED
-
-Supports:
-* Modbus TCP
-
-Import and configure the **[node-red-contrib-modbus](https://flows.nodered.org/node/node-red-contrib-modbus)** package. You can use Node RED as:
+Supports Modbus TCP. Import and configure the **[node-red-contrib-modbus](https://flows.nodered.org/node/node-red-contrib-modbus)** package. You can use Node RED as:
 * a rudimentary automation system on its own
 * an intermediary between the Modbus gateway and other home automation system
 * an intermediary between the Modbus gateway and a time series database and visualisation tool (InfluxDB + Grafana)
 
 
-## Where can I learn more about Modbus protocols?
+# Where can I learn more about Modbus protocols?
 
 https://en.wikipedia.org/wiki/Modbus
 
@@ -238,7 +239,7 @@ https://modbus.org/specs.php
 
 http://www.simplymodbus.ca/FAQ.htm
 
-## Can I use just the web interface for my own project?
+# Can I use just the web interface for my own project?
 Feel free to use this sketch as a template for a web interface within your own project. Look into the main file (arduino-modbus-rtu-tcp-gateway.ino) for how settings are stored in and loaded from EEPROM during boot. Ethernet interface and Webserver is started via function in 01-interfaces.ino. All other functions related to the web server (reading from clients, sending pages to clients) can be found in separate files (04-webserver.ino , 05-pages.ino ). Feel free to adjust them.
 
 The key to success is:
@@ -250,24 +251,24 @@ The key to success is:
 
 Big thanks to the authors of these libraries and tutorials!
 
-## Limitations
+# Limitations and Known  Issues
 
-#### Portability
+## Portability
 
 The code was tested on Arduino Nano, Uno and Mega, ethernet chips W5100 and W5500. It may work on other platforms, but:
 
 * The random number generator (for random MAC) is seeded through watch dog timer interrupt - this will work only on Arduino (credits to https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed)
 * The restart function will also work only on Arduino.
 
-#### Ethernet sockets
+## Ethernet sockets
 
 The number of used sockets is determined (by the Ethernet.h library) based on microcontroller RAM. Therefore, even if you use W5500 (which has 8 sockets available) on Arduino Nano, only 4 sockets will be used due to limited RAM on Nano.
 
-#### Memory
+## Memory
 
 Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in advanced settings.
 
-## Version history
+# Version history
 
 For version history see:
 
