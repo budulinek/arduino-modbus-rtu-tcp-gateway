@@ -16,7 +16,9 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
   - [Home Assistant](#home-assistant)
   - [OpenHAB](#openhab)
   - [Node-RED](#node-red)
-* 
+* [Limitations and Known Issues](#limitations-and-known-issues)
+* [Links and Credits](#links-and-credits)
+* [Version History](#version-history)
 
 # What is it good for?
 
@@ -269,8 +271,6 @@ https://werner.rothschopf.net/202003_arduino_webserver_post_en.htm
 
 Big thanks to the authors of these libraries and tutorials!
 
-# Version history
+# Version History
 
-For version history see:
-
-https://github.com/budulinek/arduino-modbus-rtu-tcp-gateway/blob/master/arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino#L27
+For version history see [arduino-modbus-rtu-tcp-gateway.ino](arduino-modbus-rtu-tcp-gateway/arduino-modbus-rtu-tcp-gateway.ino)
