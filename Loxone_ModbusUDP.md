@@ -30,9 +30,9 @@ Consult the user manual (data sheet) for your Modbus device and send a test Modb
 
 `04 04 00 01 00 02`
 
-`04`: Slave ID
-`04`: Function Code (read input registers)
-`00 01`: Address of first register to read
+`04`: Slave ID<br>
+`04`: Function Code (read input registers)<br>
+`00 01`: Address of first register to read<br>
 `00 02`: Number of registers to read. I am interested in 2 registers (temperature and humidity). You can ask for up to 123 registers in one request which is quite handy if you have devices with multiple sensors, energy meters with multiple channels, etc.
 We do not need to calculate the CRC - the gateway will calculate and add the CRC itself.
 
@@ -40,11 +40,11 @@ Modbus RTU Response:
 
 `04 04 04 00 C5 02 DF FE 41`
 
-`04`: Slave ID (copy from request)
-`04`: Function Code (copy from request)
-`04`: Number of bytes of register values to follow (2 registers x 2 bytes per register)
-`00 C5`: Temperature HEX 00C5 = DEC 197 which means 19,7°C
-`02 DF`: Humidity HEX 02DF = DEC 735 which means 73,5 % relative humidity
+`04`: Slave ID (copy from request)<br>
+`04`: Function Code (copy from request)<br>
+`04`: Number of bytes of register values to follow (2 registers x 2 bytes per register)<br>
+`00 C5`: Temperature HEX 00C5 = DEC 197 which means 19,7°C<br>
+`02 DF`: Humidity HEX 02DF = DEC 735 which means 73,5 % relative humidity<br>
 `FE 41`: CRC (does not interest us)
 
 ## Modbus UDP Request
@@ -62,10 +62,10 @@ Create new Modbus UDP request as **Virtual Output Command** with the following p
 **Command for ON**: `\x00\x01\x00\x00\x00\x06\x04\x04\x00\x01\x00\x02`
 The command is a Modbus TCP/UDP message, `\x` in Loxone syntax means we are sending the data as raw hex:
 
-`00 01`: Transaction ID. Choose unique transaction ID for each request so that you can match requests and responses. You can use any value but it is a good idea to use the registry address as your transaction ID (thanks @smotek7 for the suggestion!)
-`00 00`: Protocol ID. Must be `00 00`
-`00 06`: Length. The number of bytes in the remainder of the message. Calculate it yourself.
-`04 04 00 01 00 02`: This is exactly the same Modbus RTU request (without CRC) we have tested earlier. It contains the slave ID, function code and data (which registers we are requested in).
+`00 01`: Transaction ID. Choose unique transaction ID for each request so that you can match requests and responses. You can use any value but it is a good idea to use the registry address as your transaction ID (thanks @smotek7 for the suggestion!)<br>
+`00 00`: Protocol ID. Must be `00 00`<br>
+`00 06`: Length. The number of bytes in the remainder of the message. Calculate it yourself.<br>
+`04 04 00 01 00 02`: This is exactly the same Modbus RTU request (without CRC) we have tested earlier. It contains the slave ID, function code and data (which registers we are requested in).<br>
 We do not have to calculate CRC in Loxone because there is no CRC in Modbus TCP/UDP messages.
 
 **Repetition Interval [s]**: 
@@ -82,14 +82,14 @@ In Loxone Config open the UDP Monitor and you will see Modbus UDP responses arri
 
 `00 01 00 00 00 07 04 04 04 00 c5 02 df`
 
-`00 01`: Transaction ID (copy from Modbus TCP/UDP request)
-`00 00`: Protocol ID.
-`00 07`: Length. The number of bytes in the remainder of the message.
-`04`: Slave ID (copy from request)
-`04`: Function Code (copy from request)
-`04`: Number of bytes of register values to follow (2 registers x 2 bytes per register)
-`00 C5`: Temperature
-`02 DF`: Humidity
+`00 01`: Transaction ID (copy from Modbus UDP request)<br>
+`00 00`: Protocol ID.<br>
+`00 07`: Length. The number of bytes in the remainder of the message.<br>
+`04`: Slave ID (copy from request)<br>
+`04`: Function Code (copy from request)<br>
+`04`: Number of bytes of register values to follow (2 registers x 2 bytes per register)<br>
+`00 C5`: Temperature<br>
+`02 DF`: Humidity<br>
 
 Now we need to parse the data. Create **Virtual UDP Input** (see the [tutorial](https://www.loxone.com/enen/kb/communication-with-udp/)), use the IP and UDP port of the gateway.
 
@@ -101,12 +101,13 @@ Add **Virtual UDP Input Command** for each sensor. In our case, we will use two 
 
 **Command Recognition**: `\x00\x01\s4\x04\x04\s1\2\1`
 This is the Loxone parser syntax (see [this blog post](https://sarnau.info/loxone-udp-http-command-parser-syntax/) for a comprehensive overview). Here is what the command mean:
-`\x00\x01`: Validate transaction ID. Use the same as in the request.
-`\s4`: Skip 4 bytes (protocol ID, length)
-`\x04`: Validate Slave ID (the same as in the request)
-`\x04`: Validate Function code (same as in the request), check against Modbus exception codes (in case of an error, the gateway returns Function code increased by 0xB0)
-`\s1`: Skip one byte (number of bytes of register values to follow)
+`\x00\x01`: Validate transaction ID. Use the same as in the request.<br>
+`\s4`: Skip 4 bytes (protocol ID, length)<br>
+`\x04`: Validate Slave ID (the same as in the request)<br>
+`\x04`: Validate Function code (same as in the request), check against Modbus exception codes (in case of an error, the gateway returns Function code increased by 0xB0)<br>
+`\s1`: Skip one byte (number of bytes of register values to follow)<br>
 `\2\1`: Parse the value (temperature)
+
 We parse the values by individual bytes. `\1`…`\8` stores the respective byte as part of a 64-bit binary integer result. `\1` is the LSB, `\8` is the MSB. The logic is quite simple:
 * byte: `\1`
 * 16-bit integer (in 1 register): `\2\1`
@@ -118,9 +119,15 @@ We parse the values by individual bytes. `\1`…`\8` stores the respective byte 
   - enable Signed Values
   - in Loxone Config convert the signed 32-bit integer to float with 2 formulas:
 <img src="pics/udp7.png" />
-formula 1: `IF(I1>=0;I1;((I1*-1)-(2^31))*-1)`
-formula 2: `(((((I1-INT(I1/2^23)*2^23)-(I1-INT(I1/2^0)*2^0))/2^0)+2^23)/(2^(23-((((I1-INT(I1/2^31)*2^31)-(I1-INT(I1/2^23)*2^23))/2^23)-127))))*IF(I2>=0;1;-1)`
 
+formula 1:
+```
+IF(I1>=0;I1;((I1*-1)-(2^31))*-1)
+```
+formula 2:
+```
+(((((I1-INT(I1/2^23)*2^23)-(I1-INT(I1/2^0)*2^0))/2^0)+2^23)/(2^(23-((((I1-INT(I1/2^31)*2^31)-(I1-INT(I1/2^23)*2^23))/2^23)-127))))*IF(I2>=0;1;-1)
+```
 **Signed Values**: Enable/Disable for signed/unsigned data type.
 
 **Correction**: Allows you do simple math operations + = * / with the parsed number. In our case, we are dividing the value by 10, so that we get 197 => 19,7
