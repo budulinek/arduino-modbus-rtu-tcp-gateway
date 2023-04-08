@@ -6,7 +6,7 @@ Loxone Miniserver supports Modbus TCP protocol (Network Periphery > Add Network 
 
 First the difference between Modbus RTU and Modbus TCP/UDP messages.
 
-<img src="pics/udp1.png" alt="01" style="zoom:100%;" />
+<img src="pics/udp1.png" />
 (source: https://www.simplymodbus.ca/TCP.htm)
 
 **Modbus RTU**
@@ -53,11 +53,11 @@ Add your Arduino Modbus Gateway as **Virtual UDP Output** (see [tutorial](https:
 
 `/dev/udp/192.168.1.254/502`
 
-<img src="pics/udp2.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp2.png" />
 
 Create new Modbus UDP request as **Virtual Output Command** with the following properties:
 
-<img src="pics/udp3.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp3.png" />
 
 **Command for ON**: `\x00\x01\x00\x00\x00\x06\x04\x04\x00\x01\x00\x02`
 The command is a Modbus TCP/UDP message, `\x` in Loxone syntax means we are sending the data as raw hex:
@@ -74,7 +74,7 @@ This is an interval for your Modbus request (poll). There are no limits, you can
 **Use as Digital Output**: Enabled
 The output is defined as digital. Now you need to your Virtual Output Command and place it into the Loxone Config plan and leave it there (without connection to any other block). Left click with mouse to the left end of the Virtual Output Command, small circle will appear. This means that the Virtual Output Command will be permanently ON and Loxone will send the Modbus UDP request at the specified Repetition Interval.
 
-<img src="pics/udp4.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp4.png" />
 
 ## Modbus UDP Response
 
@@ -93,11 +93,11 @@ In Loxone Config open the UDP Monitor and you will see Modbus UDP responses arri
 
 Now we need to parse the data. Create **Virtual UDP Input** (see the [tutorial](https://www.loxone.com/enen/kb/communication-with-udp/)), use the IP and UDP port of the gateway.
 
-<img src="pics/udp5.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp5.png" />
 
 Add **Virtual UDP Input Command** for each sensor. In our case, we will use two Virtual UDP Input Commands (one for humidity, another one for temperature) to parse data from a single Modbus UDP response message.
 
-<img src="pics/udp6.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp6.png" />
 
 **Command Recognition**: `\x00\x01\s4\x04\x04\s1\2\1`
 This is the Loxone parser syntax (see [this blog post](https://sarnau.info/loxone-udp-http-command-parser-syntax/) for a comprehensive overview). Here is what the command mean:
@@ -117,7 +117,7 @@ We parse the values by individual bytes. `\1`…`\8` stores the respective byte 
   - parse as signed 32-bit integer using `\1`, `\2`, `\3` and `\4` in the correct order
   - enable Signed Values
   - in Loxone Config convert the signed 32-bit integer to float with 2 formulas:
-<img src="pics/udp7.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp7.png" />
 formula 1: `IF(I1>=0;I1;((I1*-1)-(2^31))*-1)`
 formula 2: `(((((I1-INT(I1/2^23)*2^23)-(I1-INT(I1/2^0)*2^0))/2^0)+2^23)/(2^(23-((((I1-INT(I1/2^31)*2^31)-(I1-INT(I1/2^23)*2^23))/2^23)-127))))*IF(I2>=0;1;-1)`
 
