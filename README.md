@@ -1,9 +1,9 @@
-# arduino-modbus-rtu-tcp-gateway
+# Modbus RTU ⇒ Modbus TCP/UDP Gateway
 Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows you to connect Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as home automation systems). You can adjust settings through web interface.
 
 ## What is it good for?
 
-Allows you to connect your Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as monitoring systems, home automation systems). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap MAX485 module) can do the job!
+Allows you to connect your Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as monitoring systems, home automation systems). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap TTL to RS485 module) can do the job!
 
 Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via web interface (settings are automatically stored in EEPROM).
 
@@ -65,7 +65,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Generate New MAC**. Generate new MAC address. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are true random.
 
-<img src="/pics/modbus2.png" alt="02" style="zoom:100%;" />
+<img src="pics/modbus2.png" alt="02" style="zoom:100%;" />
 
 **Modbus RTU Request**. Send a Modbus RTU request directly from web UI. First byte (slave address) and second byte (function code) are mandatory, no need to calculate CRC. Gateway remembers last request for your convenience.
 
@@ -108,7 +108,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
   - gateway marks the slave as "Slave Responded" if any response is sent by the slave (even error)
 
 
-<img src="/pics/modbus3.png" alt="03" style="zoom:100%;" />
+<img src="pics/modbus3.png" alt="03" style="zoom:100%;" />
 
 **Auto IP**.\* Once enabled, Arduino will receive IP, gateway, subnet and DNS from the DHCP server.
 
@@ -120,7 +120,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **DNS**.\*
 
-<img src="/pics/modbus4.png" alt="04" style="zoom:100%;" />
+<img src="pics/modbus4.png" alt="04" style="zoom:100%;" />
 
 **Modbus TCP Port**.
 
@@ -132,7 +132,7 @@ Change settings of your Arduino-based Modbus RTU to Modbus TCP/UDP gateway via w
 
 **Modbus TCP Idle Timeout**. Amount of time that a connection is always held alive (open) with no incoming traffic from a Modbus TCP master. This timeout should be longer than polling period (scan rate) set on your Modbus TCP master device.
 
-<img src="/pics/modbus5.png" alt="05" style="zoom:100%;" />
+<img src="pics/modbus5.png" alt="05" style="zoom:100%;" />
 
 **Baud Rate**. Choose baud rate from a pre-aranged list. The list can be adjusted in advanced settings.
 
@@ -167,7 +167,7 @@ Get the hardware (cheap clones from China are sufficient) and connect together:
 
 Here is my HW setup:
 Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn) + TTL to RS485 module (HW automatic flow control)
-<img src="/pics/HW.jpg" alt="01" style="zoom:100%;" />
+<img src="pics/HW.jpg" alt="01" style="zoom:100%;" />
 
 You can either:
 - ** Download and flash my pre-compiled firmware** from "Releases".
@@ -175,6 +175,57 @@ You can either:
 
 Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
 Enjoy :-)
+
+## Integration
+
+This gateway adheres to the Modbus protocol specifications, so you can use it to connect any compliant Modbus RTU slave (Modbus device) with any compliant Modbus  TCP/UDP master (such as home automation system). Here is a quick overview how you can integrate the gateway into the most popular home automation systems:
+
+#### Loxone
+
+Loxone Miniserver (both the current Miniserver and the old Miniserver Gen. 1) supports:
+* Modbus TCP (through **Modbus Server**)
+* Modbus UDP (through **Virtual UDP output** and **Virtual UDP input**)
+
+**Modbus TCP**. You can use this Arduino Modbus gateway as a fully-fledged replacement of the Loxone Modbus Extension. In Loxone Config, go to Network Perifery > Add Network Device > Modbus Server. Specify IP and port of your gateway. Timeout [ms] should be longer than Response Timeout set in the gateway.
+<img src="pics/lox1.png" alt="01" style="zoom:50%;" />
+
+
+In the next step, add individual Modbus devices. Adding and configuring Modbus devices connected to your Arduino Modbus gateway ("Modbus Server" in Loxone Config) is identical to configuring devices connected through Loxone Modbus Extension. You can either:
+* download **Device Template** from the **[Loxone Library](https://library.loxone.com/)** (there are already hundreds of templates for various Modbus devices)
+* manually add your device following this **[official tutorial](https://www.loxone.com/enen/kb/communication-with-modbus/)**.
+
+Please note that the implementation of Modbus RTU (= Loxone Modbus Extension) and Modbus TCP (= Arduino Modbus gateway connected as "Modbus Server") in Loxone is flawed:
+* Miniserver can not poll your Modbus sensors faster than 5 seconds. This is a deliberate restriction imposed by Loxone.
+* Miniserver can not poll multiple Modbus registers at once. If you have multiple sensors on the device, Loxone will send a separate requests for each of them even if you have identical poll intervals for these sensors. This is a design flaw by Loxone.
+
+**Modbus UDP**. If you want to avoid the above mentioned limitations, you can use Modbus UDP as a communication protocol between Loxone and this Arduino Modbus gateway. See [Loxone_ModbusUDP.md](Loxone_ModbusUDP.md) on how to implement Modbus UDP in Loxone with **Virtual UDP output** and **Virtual UDP input**.
+
+#### Home Assistant
+
+Supports:
+* Modbus TCP
+* Modbus UDP
+* Modbus RTU over TCP
+
+Follow this **[official tutorial](https://www.home-assistant.io/integrations/modbus/)**.
+
+#### OpenHAB
+
+Supports:
+* Modbus TCP
+
+Follow this **[official tutorial](https://www.openhab.org/addons/bindings/modbus/)**.
+
+#### Node-RED
+
+Supports:
+* Modbus TCP
+
+Import and configure the **[node-red-contrib-modbus](https://flows.nodered.org/node/node-red-contrib-modbus)** package. You can use Node RED as:
+* a rudimentary automation system on its own
+* an intermediary between the Modbus gateway and other home automation system
+* an intermediary between the Modbus gateway and a time series database and visualisation tool (InfluxDB + Grafana)
+
 
 ## Where can I learn more about Modbus protocols?
 

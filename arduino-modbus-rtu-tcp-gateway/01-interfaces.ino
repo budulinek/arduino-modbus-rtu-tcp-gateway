@@ -103,8 +103,8 @@ void startEthernet() {
 #else  /* ENABLE_DHCP */
   Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);  // No DNS
 #endif /* ENABLE_DHCP */
-  Ethernet.setRetransmissionTimeout(TCP_RETRANSMISSION_TIMEOUT);
-  Ethernet.setRetransmissionCount(TCP_RETRANSMISSION_COUNT);
+  W5100.setRetransmissionTime(TCP_RETRANSMISSION_TIMEOUT);
+  W5100.setRetransmissionCount(TCP_RETRANSMISSION_COUNT);
   modbusServer = EthernetServer(localConfig.tcpPort);
   webServer = EthernetServer(localConfig.webPort);
   Udp.begin(localConfig.udpPort);
