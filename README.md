@@ -187,7 +187,7 @@ Loxone Miniserver (both the current Miniserver and the old Miniserver Gen. 1) su
 * Modbus UDP (through **Virtual UDP output** and **Virtual UDP input**)
 
 **Modbus TCP**. You can use this Arduino Modbus gateway as a fully-fledged replacement of the Loxone Modbus Extension. In Loxone Config, go to Network Perifery > Add Network Device > Modbus Server. Specify IP and port of your gateway. Timeout [ms] should be longer than Response Timeout set in the gateway.
-<img src="pics/lox1.png" alt="01" style="zoom:50%;" />
+<img src="pics/lox1.png" />
 
 
 In the next step, add individual Modbus devices. Adding and configuring Modbus devices connected to your Arduino Modbus gateway ("Modbus Server" in Loxone Config) is identical to configuring devices connected through Loxone Modbus Extension. You can either:
