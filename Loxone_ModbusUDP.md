@@ -7,13 +7,14 @@ Loxone Miniserver supports Modbus TCP protocol (Network Periphery > Add Network 
 First the difference between Modbus RTU and Modbus TCP/UDP messages.
 
 <img src="pics/udp1.png" />
-(source: https://www.simplymodbus.ca/TCP.htm)
+(source: https://www.simplymodbus.ca/TCP.htm)<br>
 
-**Modbus RTU**
+
+#### Modbus RTU
 * It is used on the RS485 line which connect your Modbus device to the Arduino Modbus gateway.
 * You can find the instructions on how to build the Modbus RTU message in the user manual (or data sheet) for the Modbus device you are using.
 
-**Modbus TCP/UDP**
+#### Modbus TCP/UDP
 * It is used on the Ethernet line which connect the gateway to Loxone Miniserver.
 * The Modbus TCP/UDP message is almost identical. You have 6 more bytes at the beginning, CRC (2 bytes) are missing at the end:
   - **Transaction ID**: 2 bytes set by the master (Loxone Miniserver) to uniquely identify each request. These bytes are echoed by the gateway since its responses may not be received in the same order as the requests.
@@ -101,6 +102,7 @@ Add **Virtual UDP Input Command** for each sensor. In our case, we will use two 
 
 **Command Recognition**: `\x00\x01\s4\x04\x04\s1\2\1`
 This is the Loxone parser syntax (see [this blog post](https://sarnau.info/loxone-udp-http-command-parser-syntax/) for a comprehensive overview). Here is what the command mean:
+
 `\x00\x01`: Validate transaction ID. Use the same as in the request.<br>
 `\s4`: Skip 4 bytes (protocol ID, length)<br>
 `\x04`: Validate Slave ID (the same as in the request)<br>
