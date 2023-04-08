@@ -180,15 +180,15 @@ Enjoy :-)
 
 This gateway adheres to the Modbus protocol specifications, so you can use it to connect any compliant Modbus RTU slave (Modbus device) with any compliant Modbus  TCP/UDP master (such as home automation system). Here is a quick overview how you can integrate the gateway into the most popular home automation systems:
 
-#### Loxone
+### Loxone
 
 Loxone Miniserver (both the current Miniserver and the old Miniserver Gen. 1) supports:
 * Modbus TCP (through **Modbus Server**)
 * Modbus UDP (through **Virtual UDP output** and **Virtual UDP input**)
 
 **Modbus TCP**. You can use this Arduino Modbus gateway as a fully-fledged replacement of the Loxone Modbus Extension. In Loxone Config, go to Network Perifery > Add Network Device > Modbus Server. Specify IP and port of your gateway. Timeout [ms] should be longer than Response Timeout set in the gateway.
-<img src="pics/lox1.png" />
 
+<img src="pics/lox1.png" />
 
 In the next step, add individual Modbus devices. Adding and configuring Modbus devices connected to your Arduino Modbus gateway ("Modbus Server" in Loxone Config) is identical to configuring devices connected through Loxone Modbus Extension. You can either:
 * download **Device Template** from the **[Loxone Library](https://library.loxone.com/)** (there are already hundreds of templates for various Modbus devices)
@@ -200,7 +200,7 @@ Please note that the implementation of Modbus RTU (= Loxone Modbus Extension) an
 
 **Modbus UDP**. If you want to avoid the above mentioned limitations, you can use Modbus UDP as a communication protocol between Loxone and this Arduino Modbus gateway. See [Loxone_ModbusUDP.md](Loxone_ModbusUDP.md) on how to implement Modbus UDP in Loxone with **Virtual UDP output** and **Virtual UDP input**.
 
-#### Home Assistant
+### Home Assistant
 
 Supports:
 * Modbus TCP
@@ -209,14 +209,14 @@ Supports:
 
 Follow this **[official tutorial](https://www.home-assistant.io/integrations/modbus/)**.
 
-#### OpenHAB
+### OpenHAB
 
 Supports:
 * Modbus TCP
 
 Follow this **[official tutorial](https://www.openhab.org/addons/bindings/modbus/)**.
 
-#### Node-RED
+### Node-RED
 
 Supports:
 * Modbus TCP
