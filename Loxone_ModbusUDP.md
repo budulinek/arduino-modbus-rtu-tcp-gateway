@@ -134,11 +134,12 @@ formula 2:
 
 **Correction**: Allows you do simple math operations + = * / with the parsed number. In our case, we are dividing the value by 10, so that we get 197 => 19,7
 
-Add **Virtual UDP Input Command** for the second sensor (humidity). We are parsing the same Modbus UDP response which contains a 16-bit register (2 bytes) for temperature and a 16-bit register (2 bytes) for humidity. **Command Recognition** is very similar, we only need to skip 2 more bytes (where temperature is stored). In order to get humidity we have changed `\s1` to `\s3`: `\x00\x01\s4\x04\x04\s3\2\1`. If you have more sensors in the 
+Add **Virtual UDP Input Command** for the second sensor (humidity). We are parsing the same Modbus UDP response which contains a 16-bit register (2 bytes) for temperature and a 16-bit register (2 bytes) for humidity. **Command Recognition** is very similar, we only need to skip 2 more bytes (where temperature is stored). In order to get humidity we have changed `\s1` to `\s3`: `\x00\x01\s4\x04\x04\s3\2\1`. If you have more sensors in the Modbus UDP response, simply skip more bytes in order to get the bytes you want.
 
 Here is the result:
+<img src="pics/udp8.png" />
 
 ## Errors
 
 In case of an error, the Modbus device (or the gateway) responds with a message where the function code is increased by 0x80 and the next byte is the exception code (see [wiki](https://en.wikipedia.org/wiki/Modbus#Exception_responses)). In Modbus UDP, function code is the 8th byte, exception code is the 9th byte:
-<img src="pics/udp8.png" alt="01" style="zoom:50%;" />
+<img src="pics/udp9.png" />
