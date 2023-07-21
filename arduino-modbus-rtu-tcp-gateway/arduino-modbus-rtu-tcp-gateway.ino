@@ -20,7 +20,7 @@
                   improved TCP socket management, Modbus TCP Idle Timeout settings
   v6.0 2023-03-18 Save error counters to EEPROM, code optimization, separate file for advanced settings
   v6.1 2023-04-12 Code optimization
-  v7.0 2023-XX-XX Manual MAC, better data types
+  v7.0 2023-07-21 Manual MAC, better data types
 */
 
 const uint8_t VERSION[] = { 7, 0 };
