@@ -100,6 +100,9 @@ You can either:
 Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
 Enjoy :-)
 # Settings
+  - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
+  - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
+
 ## System Info
 <img src="pics/modbus1.png" alt="01" style="zoom:100%;" />
 
@@ -111,7 +114,7 @@ Enjoy :-)
 
 **Ethernet Sockets**. Max number of usable sockets. See Limitations bellow. One socket is reserved for Modbus UDP, remaining sockets are shared between Modbus TCP and WebUI.
 
-**Generate New MAC**. Generate new MAC address. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are true random.
+**MAC Address**. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are random. You can also set manual MAC in IP Settings.
 
 ## Modbus Status
 <img src="pics/modbus2.png" alt="02" style="zoom:100%;" />
@@ -158,6 +161,8 @@ Enjoy :-)
 
 ## IP Settings
 <img src="pics/modbus3.png" alt="03" style="zoom:100%;" />
+
+**MAC Address**. Change MAC address. "Randomize" button will generate new random MAC (first 3 bytes fixed 90:A2:DA, last 3 bytes will be random).
 
 **Auto IP**.\* Once enabled, Arduino will receive IP, gateway, subnet and DNS from the DHCP server.
 
