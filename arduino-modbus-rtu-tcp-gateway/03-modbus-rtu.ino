@@ -94,14 +94,14 @@ void sendSerial() {
           // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
           setSlaveStatus(queueData[0], SLAVE_ERROR_0B, true, false);
           uint8_t MBAP[] = { myHeader.tid[0],
-                          myHeader.tid[1],
-                          0x00,
-                          0x00,
-                          0x00,
-                          0x03 };
+                             myHeader.tid[1],
+                             0x00,
+                             0x00,
+                             0x00,
+                             0x03 };
           uint8_t PDU[5] = { queueData[0],
-                          byte(queueData[1] + 0x80),
-                          0x0B };
+                             byte(queueData[1] + 0x80),
+                             0x0B };
           crc = 0xFFFF;
           for (uint8_t i = 0; i < 3; i++) {
             calculateCRC(PDU[i]);
@@ -216,10 +216,10 @@ bool checkCRC(uint8_t buf[], int16_t len) {
 }
 
 void calculateCRC(uint8_t b) {
-  crc ^= (uint16_t)b;              // XOR byte into least sig. byte of crc
+  crc ^= (uint16_t)b;                 // XOR byte into least sig. byte of crc
   for (uint8_t i = 8; i != 0; i--) {  // Loop over each bit
-    if ((crc & 0x0001) != 0) {     // If the LSB is set
-      crc >>= 1;                   // Shift right and XOR 0xA001
+    if ((crc & 0x0001) != 0) {        // If the LSB is set
+      crc >>= 1;                      // Shift right and XOR 0xA001
       crc ^= 0xA001;
     } else        // Else LSB is not set
       crc >>= 1;  // Just shift right

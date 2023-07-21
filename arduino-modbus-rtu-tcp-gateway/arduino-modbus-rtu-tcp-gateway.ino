@@ -42,7 +42,7 @@ typedef struct {
   uint8_t ip[4];
   uint8_t subnet[4];
   uint8_t gateway[4];
-  uint8_t dns[4];      // only used if ENABLE_DHCP
+  uint8_t dns[4];   // only used if ENABLE_DHCP
   bool enableDhcp;  // only used if ENABLE_DHCP
   uint16_t tcpPort;
   uint16_t udpPort;
@@ -60,19 +60,19 @@ typedef struct {
 config_type localConfig;
 
 typedef struct {
-  uint8_t tid[2];           // MBAP Transaction ID
-  uint8_t msgLen;           // lenght of Modbus message stored in queueData
-  IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
-  uint16_t remPort;  // remote port for UDP client (UDP response is sent back to remote port)
-  uint8_t requestType;      // TCP client who sent the request
-  uint8_t atts;             // attempts counter
+  uint8_t tid[2];       // MBAP Transaction ID
+  uint8_t msgLen;       // lenght of Modbus message stored in queueData
+  IPAddress remIP;      // remote IP for UDP client (UDP response is sent back to remote IP)
+  uint16_t remPort;     // remote port for UDP client (UDP response is sent back to remote port)
+  uint8_t requestType;  // TCP client who sent the request
+  uint8_t atts;         // attempts counter
 } header;
 
 #include "advanced_settings.h"
 
 // each request is stored in 3 queues (all queues are written to, read and deleted in sync)
 CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
-CircularBuffer<uint8_t, MAX_QUEUE_DATA> queueData;           // queue of PDU data
+CircularBuffer<uint8_t, MAX_QUEUE_DATA> queueData;        // queue of PDU data
 
 
 /****** ETHERNET AND SERIAL ******/
@@ -175,7 +175,7 @@ uint32_t errorCount[ERROR_LAST];  // there is no counter for SLAVE_ERROR_0B_QUEU
 uint32_t eepromWrites;  // Number of EEPROM write cycles
 
 bool scanReqInQueue = false;  // Scan request is in the queue
-uint8_t priorityReqInQueue;      // Counter for priority requests in the queue
+uint8_t priorityReqInQueue;   // Counter for priority requests in the queue
 
 uint8_t response[MAX_RESPONSE_LEN];  // buffer to store the last Modbus response
 uint8_t responseLen;                 // stores actual length of the response shown in WebUI
