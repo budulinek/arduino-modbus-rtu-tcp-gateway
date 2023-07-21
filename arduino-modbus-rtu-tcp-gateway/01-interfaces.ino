@@ -55,8 +55,8 @@ void startSerial() {
 }
 
 // number of bits per character (11 in default Modbus RTU settings)
-byte bitsPerChar() {
-  byte bits =
+uint8_t bitsPerChar() {
+  uint8_t bits =
     1 +                                                         // start bit
     (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
     (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
@@ -65,7 +65,7 @@ byte bitsPerChar() {
 }
 
 // character timeout in micros
-unsigned long charTimeOut() {
+uint32_t charTimeOut() {
   if (localConfig.baud <= 192) {
     return (15000UL * bitsPerChar()) / localConfig.baud;  // inter-character time-out should be 1,5T
   } else {
@@ -74,7 +74,7 @@ unsigned long charTimeOut() {
 }
 
 // minimum frame delay in micros
-unsigned long frameDelay() {
+uint32_t frameDelay() {
   if (localConfig.baud <= 192) {
     return (35000UL * bitsPerChar()) / localConfig.baud;  // inter-frame delay should be 3,5T
   } else {
@@ -90,9 +90,6 @@ void startEthernet() {
     digitalWrite(ETH_RESET_PIN, HIGH);
     delay(ETH_RESET_DELAY);
   }
-  byte mac[6];
-  memcpy(mac, MAC_START, 3);               // set first 3 bytes
-  memcpy(mac + 3, localConfig.macEnd, 3);  // set last 3 bytes
 #ifdef ENABLE_DHCP
   if (localConfig.enableDhcp) {
     dhcpSuccess = Ethernet.begin(mac);
@@ -131,7 +128,7 @@ void maintainDhcp() {
 
 #ifdef ENABLE_EXTRA_DIAG
 void maintainUptime() {
-  unsigned long milliseconds = millis();
+  uint32_t milliseconds = millis();
   if (last_milliseconds > milliseconds) {
     //in case of millis() overflow, store existing passed seconds
     remaining_seconds = seconds;
@@ -147,8 +144,8 @@ void maintainUptime() {
 
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
-  const unsigned long ROLLOVER = 0xFFFFFF00;
-  for (byte i = 0; i < ERROR_LAST; i++) {
+  const uint32_t ROLLOVER = 0xFFFFFF00;
+  for (uint8_t i = 0; i < ERROR_LAST; i++) {
     if (errorCount[i] > ROLLOVER) {
       return true;
     }
@@ -157,7 +154,7 @@ bool rollover() {
   if (seconds > ROLLOVER) {
     return true;
   }
-  for (byte i = 0; i < DATA_LAST; i++) {
+  for (uint8_t i = 0; i < DATA_LAST; i++) {
     if (rtuCount[i] > ROLLOVER || ethCount[i] > ROLLOVER) {
       return true;
     }
@@ -181,8 +178,9 @@ void generateMac() {
   seed1 = 36969L * (seed1 & 65535L) + (seed1 >> 16);
   seed2 = 18000L * (seed2 & 65535L) + (seed2 >> 16);
   uint32_t randomBuffer = (seed1 << 16) + seed2; /* 32-bit random */
-  for (byte i = 0; i < 3; i++) {
-    localConfig.macEnd[i] = randomBuffer & 0xFF;
+  memcpy(mac, MAC_START, 3);                     // set first 3 bytes
+  for (uint8_t i = 0; i < 3; i++) {
+    mac[i + 3] = randomBuffer & 0xFF;  // random last 3 bytes
     randomBuffer >>= 8;
   }
 }
@@ -190,11 +188,13 @@ void generateMac() {
 void updateEeprom() {
   eepromTimer.sleep(EEPROM_INTERVAL * 60UL * 60UL * 1000UL);  // EEPROM_INTERVAL is in hours, sleep is in milliseconds!
   eepromWrites++;                                             // we assume that at least some bytes are written to EEPROM during EEPROM.update or EEPROM.put
-  int address = CONFIG_START;
+  uint16_t address = CONFIG_START;
   EEPROM.put(address, eepromWrites);
   address += sizeof(eepromWrites);
   EEPROM.put(address, VERSION[0]);
   address += 1;
+  EEPROM.put(address, mac);
+  address += 6;
   EEPROM.put(address, localConfig);
   address += sizeof(localConfig);
   EEPROM.put(address, errorCount);
@@ -208,25 +208,25 @@ void updateEeprom() {
 }
 
 #if MAX_SOCK_NUM == 8
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+uint8_t socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #elif MAX_SOCK_NUM == 4
-unsigned long lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
-byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
+uint32_t lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
+uint8_t socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 #endif
 
 // from https://github.com/SapientHetero/Ethernet/blob/master/src/socket.cpp
 void manageSockets() {
   uint32_t maxAge = 0;         // the 'age' of the socket in a 'disconnectable' state that was last used the longest time ago
-  byte oldest = MAX_SOCK_NUM;  // the socket number of the 'oldest' disconnectable socket
-  byte modbusListening = MAX_SOCK_NUM;
-  byte webListening = MAX_SOCK_NUM;
-  byte dataAvailable = MAX_SOCK_NUM;
-  byte socketsAvailable = 0;
+  uint8_t oldest = MAX_SOCK_NUM;  // the socket number of the 'oldest' disconnectable socket
+  uint8_t modbusListening = MAX_SOCK_NUM;
+  uint8_t webListening = MAX_SOCK_NUM;
+  uint8_t dataAvailable = MAX_SOCK_NUM;
+  uint8_t socketsAvailable = 0;
   // SPI.beginTransaction(SPI_ETHERNET_SETTINGS);								// begin SPI transaction
   // look at all the hardware sockets, record and take action based on current states
-  for (byte s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
-    byte status = W5100.readSnSR(s);                 //  get socket status...
+  for (uint8_t s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
+    uint8_t status = W5100.readSnSR(s);                 //  get socket status...
     uint32_t sockAge = millis() - lastSocketUse[s];  // age of the current socket
     if (socketInQueue[s] > 0) {
       lastSocketUse[s] = millis();
@@ -313,7 +313,7 @@ void manageSockets() {
   // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction()
 }
 
-void disconSocket(byte s) {
+void disconSocket(uint8_t s) {
   if (W5100.readSnSR(s) == SnSR::ESTABLISHED) {
     W5100.execCmdSn(s, Sock_DISCON);  // Sock_DISCON does not close LISTEN sockets
     lastSocketUse[s] = millis();      //   record time at which it was sent...

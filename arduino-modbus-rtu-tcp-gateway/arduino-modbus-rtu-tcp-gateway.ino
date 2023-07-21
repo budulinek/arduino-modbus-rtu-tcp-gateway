@@ -20,9 +20,10 @@
                   improved TCP socket management, Modbus TCP Idle Timeout settings
   v6.0 2023-03-18 Save error counters to EEPROM, code optimization, separate file for advanced settings
   v6.1 2023-04-12 Code optimization
+  v7.0 2023-XX-XX Manual MAC, better data types
 */
 
-const byte VERSION[] = { 6, 1 };
+const uint8_t VERSION[] = { 7, 0 };
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -38,51 +39,52 @@ const byte VERSION[] = { 6, 1 };
 #include <util/atomic.h>
 
 typedef struct {
-  byte macEnd[3];
-  byte ip[4];
-  byte subnet[4];
-  byte gateway[4];
-  byte dns[4];      // only used if ENABLE_DHCP
+  uint8_t ip[4];
+  uint8_t subnet[4];
+  uint8_t gateway[4];
+  uint8_t dns[4];      // only used if ENABLE_DHCP
   bool enableDhcp;  // only used if ENABLE_DHCP
-  unsigned int tcpPort;
-  unsigned int udpPort;
-  unsigned int webPort;
+  uint16_t tcpPort;
+  uint16_t udpPort;
+  uint16_t webPort;
   bool enableRtuOverTcp;
-  unsigned int tcpTimeout;
-  unsigned int baud;
-  byte serialConfig;
-  byte frameDelay;
-  unsigned int serialTimeout;
-  byte serialAttempts;
+  uint16_t tcpTimeout;
+  uint16_t baud;
+  uint8_t serialConfig;
+  uint8_t frameDelay;
+  uint16_t serialTimeout;
+  uint8_t serialAttempts;
 } config_type;
 
 // local configuration values (stored in RAM)
 config_type localConfig;
 
 typedef struct {
-  byte tid[2];           // MBAP Transaction ID
-  byte msgLen;           // lenght of Modbus message stored in queueData
+  uint8_t tid[2];           // MBAP Transaction ID
+  uint8_t msgLen;           // lenght of Modbus message stored in queueData
   IPAddress remIP;       // remote IP for UDP client (UDP response is sent back to remote IP)
-  unsigned int remPort;  // remote port for UDP client (UDP response is sent back to remote port)
-  byte requestType;      // TCP client who sent the request
-  byte atts;             // attempts counter
+  uint16_t remPort;  // remote port for UDP client (UDP response is sent back to remote port)
+  uint8_t requestType;      // TCP client who sent the request
+  uint8_t atts;             // attempts counter
 } header;
 
 #include "advanced_settings.h"
 
 // each request is stored in 3 queues (all queues are written to, read and deleted in sync)
 CircularBuffer<header, MAX_QUEUE_REQUESTS> queueHeaders;  // queue of requests' headers and metadata
-CircularBuffer<byte, MAX_QUEUE_DATA> queueData;           // queue of PDU data
+CircularBuffer<uint8_t, MAX_QUEUE_DATA> queueData;           // queue of PDU data
 
 
 /****** ETHERNET AND SERIAL ******/
+
+uint8_t mac[6];  // MAC Address (initial value is random generated)
 
 #ifdef UDP_TX_PACKET_MAX_SIZE
 #undef UDP_TX_PACKET_MAX_SIZE
 #define UDP_TX_PACKET_MAX_SIZE MODBUS_SIZE
 #endif
 
-byte maxSockNum = MAX_SOCK_NUM;
+uint8_t maxSockNum = MAX_SOCK_NUM;
 
 #ifdef ENABLE_DHCP
 bool dhcpSuccess = false;
@@ -96,38 +98,38 @@ EthernetServer webServer(DEFAULT_CONFIG.webPort);
 
 class MicroTimer {
 private:
-  unsigned long timestampLastHitMs;
-  unsigned long sleepTimeMs;
+  uint32_t timestampLastHitMs;
+  uint32_t sleepTimeMs;
 public:
   boolean isOver();
-  void sleep(unsigned long sleepTimeMs);
+  void sleep(uint32_t sleepTimeMs);
 };
 boolean MicroTimer::isOver() {
-  if ((unsigned long)(micros() - timestampLastHitMs) > sleepTimeMs) {
+  if ((uint32_t)(micros() - timestampLastHitMs) > sleepTimeMs) {
     return true;
   }
   return false;
 }
-void MicroTimer::sleep(unsigned long sleepTimeMs) {
+void MicroTimer::sleep(uint32_t sleepTimeMs) {
   this->sleepTimeMs = sleepTimeMs;
   timestampLastHitMs = micros();
 }
 
 class Timer {
 private:
-  unsigned long timestampLastHitMs;
-  unsigned long sleepTimeMs;
+  uint32_t timestampLastHitMs;
+  uint32_t sleepTimeMs;
 public:
   boolean isOver();
-  void sleep(unsigned long sleepTimeMs);
+  void sleep(uint32_t sleepTimeMs);
 };
 boolean Timer::isOver() {
-  if ((unsigned long)(millis() - timestampLastHitMs) > sleepTimeMs) {
+  if ((uint32_t)(millis() - timestampLastHitMs) > sleepTimeMs) {
     return true;
   }
   return false;
 }
-void Timer::sleep(unsigned long sleepTimeMs) {
+void Timer::sleep(uint32_t sleepTimeMs) {
   this->sleepTimeMs = sleepTimeMs;
   timestampLastHitMs = millis();
 }
@@ -139,20 +141,20 @@ Timer eepromTimer;  // timer to delay writing statistics to EEPROM
 #define RS485_TRANSMIT HIGH
 #define RS485_RECEIVE LOW
 
-byte scanCounter = 1;  // Start Modbus RTU scan after boot
-enum state : byte {
+uint8_t scanCounter = 1;  // Start Modbus RTU scan after boot
+enum state : uint8_t {
   IDLE,
   SENDING,
   DELAY,
   WAITING
 };
 
-byte serialState;
+uint8_t serialState;
 
 
 /****** RUN TIME AND DATA COUNTERS ******/
 
-enum status : byte {
+enum status : uint8_t {
   SLAVE_OK,              // Slave Responded
   SLAVE_ERROR_0X,        // Slave Responded with Error (Codes 1~8)
   SLAVE_ERROR_0A,        // Gateway Overloaded (Code 10)
@@ -173,29 +175,29 @@ uint32_t errorCount[ERROR_LAST];  // there is no counter for SLAVE_ERROR_0B_QUEU
 uint32_t eepromWrites;  // Number of EEPROM write cycles
 
 bool scanReqInQueue = false;  // Scan request is in the queue
-byte priorityReqInQueue;      // Counter for priority requests in the queue
+uint8_t priorityReqInQueue;      // Counter for priority requests in the queue
 
-byte response[MAX_RESPONSE_LEN];  // buffer to store the last Modbus response
-byte responseLen;                 // stores actual length of the response shown in WebUI
+uint8_t response[MAX_RESPONSE_LEN];  // buffer to store the last Modbus response
+uint8_t responseLen;                 // stores actual length of the response shown in WebUI
 
 uint16_t queueDataSize;
 uint8_t queueHeadersSize;
 
 #ifdef ENABLE_EXTRA_DIAG
 // store uptime seconds (includes seconds counted before millis() overflow)
-unsigned long seconds;
+uint32_t seconds;
 // store last millis() so that we can detect millis() overflow
-unsigned long last_milliseconds = 0;
+uint32_t last_milliseconds = 0;
 // store seconds passed until the moment of the overflow so that we can add them to "seconds" on the next call
-long remaining_seconds;
-// Data counters (we only use unsigned long in ENABLE_EXTRA_DIAG, to save flash memory)
-enum data_count : byte {
+int32_t remaining_seconds;
+// Data counters (we only use uint32_t in ENABLE_EXTRA_DIAG, to save flash memory)
+enum data_count : uint8_t {
   DATA_TX,
   DATA_RX,
   DATA_LAST  // Number of status flags in this enum. Must be the last element within this enum!!
 };
-unsigned long rtuCount[DATA_LAST];
-unsigned long ethCount[DATA_LAST];
+uint32_t rtuCount[DATA_LAST];
+uint32_t ethCount[DATA_LAST];
 #endif /* ENABLE_EXTRA_DIAG */
 
 volatile uint32_t seed1;  // seed1 is generated by CreateTrulyRandomSeed()
@@ -208,13 +210,15 @@ uint32_t seed2 = 17111989;  // seed2 is static
 void setup() {
   CreateTrulyRandomSeed();
 
-  int address = CONFIG_START;
+  uint8_t address = CONFIG_START;
   EEPROM.get(address, eepromWrites);  // EEPROM write counter is persistent, it is never cleared during factory resets
   address += sizeof(eepromWrites);
   // is configuration already stored in EEPROM?
   if (EEPROM.read(address) == VERSION[0]) {
     // load configuration, error counters and other data countersfrom EEPROM
     address += 1;
+    EEPROM.get(address, mac);
+    address += 6;
     EEPROM.get(address, localConfig);
     address += sizeof(localConfig);
     EEPROM.get(address, errorCount);
