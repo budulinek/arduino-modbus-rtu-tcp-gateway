@@ -44,10 +44,10 @@ void recvUdp() {
   if (msgLength) {
 #ifdef ENABLE_EXTRA_DIAG
     ethCount[DATA_RX] += msgLength;
-#endif                               /* ENABLE_EXTRA_DIAG */
+#endif                                  /* ENABLE_EXTRA_DIAG */
     uint8_t inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
-                                     // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address)..... no CRC
-                                     // Modbus RTU frame: [0] address.....[n-1][n] CRC
+                                        // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address)..... no CRC
+                                        // Modbus RTU frame: [0] address.....[n-1][n] CRC
     Udp.read(inBuffer, sizeof(inBuffer));
     while (Udp.available()) Udp.read();
     uint8_t errorCode = checkRequest(inBuffer, msgLength, (uint32_t)Udp.remoteIP(), Udp.remotePort(), UDP_REQUEST);
@@ -59,8 +59,8 @@ void recvUdp() {
         Udp.write(0x03);
       }
       uint8_t addressPos = 6 * !localConfig.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
-      Udp.write(inBuffer[addressPos]);                      // address
-      Udp.write(inBuffer[addressPos + 1] + 0x80);           // function + 0x80
+      Udp.write(inBuffer[addressPos]);                         // address
+      Udp.write(inBuffer[addressPos + 1] + 0x80);              // function + 0x80
       Udp.write(errorCode);
       if (localConfig.enableRtuOverTcp) {
         crc = 0xFFFF;
@@ -83,7 +83,7 @@ void recvTcp(EthernetClient &client) {
   uint16_t msgLength = client.available();
 #ifdef ENABLE_EXTRA_DIAG
   ethCount[DATA_RX] += msgLength;
-#endif                             /* ENABLE_EXTRA_DIAG */
+#endif                                /* ENABLE_EXTRA_DIAG */
   uint8_t inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
   // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
   // Modbus RTU frame: [0] address.....
@@ -100,8 +100,8 @@ void recvTcp(EthernetClient &client) {
       i = 6;
     }
     uint8_t addressPos = 6 * !localConfig.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
-    outBuffer[i++] = inBuffer[addressPos];                // address
-    outBuffer[i++] = inBuffer[addressPos + 1] + 0x80;     // function + 0x80
+    outBuffer[i++] = inBuffer[addressPos];                   // address
+    outBuffer[i++] = inBuffer[addressPos + 1] + 0x80;        // function + 0x80
     outBuffer[i++] = errorCode;
     if (localConfig.enableRtuOverTcp) {
       crc = 0xFFFF;
@@ -150,7 +150,7 @@ void scanRequest() {
 
 uint8_t checkRequest(uint8_t inBuffer[], uint16_t msgLength, const uint32_t remoteIP, const uint16_t remotePort, uint8_t requestType) {
   uint8_t addressPos = 6 * !localConfig.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
-  if (localConfig.enableRtuOverTcp) {                   // check CRC for Modbus RTU over TCP/UDP
+  if (localConfig.enableRtuOverTcp) {                      // check CRC for Modbus RTU over TCP/UDP
     if (checkCRC(inBuffer, msgLength) == false) {
       errorCount[ERROR_TCP]++;
       return 0;  // drop request and do not return any error code

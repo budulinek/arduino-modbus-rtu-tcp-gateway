@@ -217,7 +217,7 @@ uint8_t socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 
 // from https://github.com/SapientHetero/Ethernet/blob/master/src/socket.cpp
 void manageSockets() {
-  uint32_t maxAge = 0;         // the 'age' of the socket in a 'disconnectable' state that was last used the longest time ago
+  uint32_t maxAge = 0;            // the 'age' of the socket in a 'disconnectable' state that was last used the longest time ago
   uint8_t oldest = MAX_SOCK_NUM;  // the socket number of the 'oldest' disconnectable socket
   uint8_t modbusListening = MAX_SOCK_NUM;
   uint8_t webListening = MAX_SOCK_NUM;
@@ -225,8 +225,8 @@ void manageSockets() {
   uint8_t socketsAvailable = 0;
   // SPI.beginTransaction(SPI_ETHERNET_SETTINGS);								// begin SPI transaction
   // look at all the hardware sockets, record and take action based on current states
-  for (uint8_t s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
-    uint8_t status = W5100.readSnSR(s);                 //  get socket status...
+  for (uint8_t s = 0; s < maxSockNum; s++) {         // for each hardware socket ...
+    uint8_t status = W5100.readSnSR(s);              //  get socket status...
     uint32_t sockAge = millis() - lastSocketUse[s];  // age of the current socket
     if (socketInQueue[s] > 0) {
       lastSocketUse[s] = millis();
