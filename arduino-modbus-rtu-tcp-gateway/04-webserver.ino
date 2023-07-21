@@ -19,11 +19,11 @@
 
    ***************************************************************** */
 
-const byte URI_SIZE = 24;   // a smaller buffer for uri
-const byte POST_SIZE = 24;  // a smaller buffer for single post parameter + key
+const uint8_t URI_SIZE = 24;   // a smaller buffer for uri
+const uint8_t POST_SIZE = 24;  // a smaller buffer for single post parameter + key
 
 // Actions that need to be taken after saving configuration.
-enum action_type : byte {
+enum action_type : uint8_t {
   ACT_NONE,
   ACT_FACTORY,        // Load default factory settings (but keep MAC address)
   ACT_MAC,            // Generate new random MAC
@@ -40,7 +40,7 @@ enum action_type action;
 // Pages served by the webserver. Order of elements defines the order in the left menu of the web UI.
 // URL of the page (*.htm) contains number corresponding to its position in this array.
 // The following enum array can have a maximum of 10 elements (incl. PAGE_NONE and PAGE_WAIT)
-enum page : byte {
+enum page : uint8_t {
   PAGE_ERROR,  // 404 Error
   PAGE_INFO,
   PAGE_STATUS,
@@ -54,9 +54,15 @@ enum page : byte {
 // Keys for POST parameters, used in web forms and processed by processPost() function.
 // Using enum ensures unique identification of each POST parameter key and consistence across functions.
 // In HTML code, each element will apear as number corresponding to its position in this array.
-enum post_key : byte {
+enum post_key : uint8_t {
   POST_NONE,  // reserved for NULL
   POST_DHCP,  // enable DHCP
+  POST_MAC,
+  POST_MAC_1,
+  POST_MAC_2,
+  POST_MAC_3,
+  POST_MAC_4,
+  POST_MAC_5,
   POST_IP,
   POST_IP_1,
   POST_IP_2,
@@ -96,12 +102,12 @@ enum post_key : byte {
   POST_ACTION,    // actions on Tools page
 };
 
-byte request[POST_REQ_LAST - POST_REQ + 1];  // Array to store Modbus request sent from WebUI
-byte requestLen = 0;                         // Length of the Modbus request send from WebUI
+uint8_t request[POST_REQ_LAST - POST_REQ + 1];  // Array to store Modbus request sent from WebUI
+uint8_t requestLen = 0;                         // Length of the Modbus request send from WebUI
 
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
-enum JSON_type : byte {
+enum JSON_type : uint8_t {
   JSON_TIME,  // Runtime seconds
   JSON_RTU_DATA,
   JSON_ETH_DATA,
@@ -120,7 +126,7 @@ void recvWeb(EthernetClient &client) {
   while (client.available()) {        // start reading the first line which should look like: GET /uri HTTP/1.1
     if (client.read() == ' ') break;  // find space before /uri
   }
-  byte len = 0;
+  uint8_t len = 0;
   while (client.available() && len < sizeof(uri) - 1) {
     char c = client.read();  // parse uri
     if (c == ' ') break;     // find space after /uri
@@ -139,7 +145,7 @@ void recvWeb(EthernetClient &client) {
   }
 
   // Get the requested page from URI
-  byte reqPage = PAGE_ERROR;  // requested page, 404 error is a default
+  uint8_t reqPage = PAGE_ERROR;  // requested page, 404 error is a default
   if (uri[0] == '/') {
     if (uri[1] == '\0')  // the homepage System Info
       reqPage = PAGE_INFO;
@@ -161,7 +167,7 @@ void recvWeb(EthernetClient &client) {
   if (reqPage == PAGE_WAIT) {
     switch (action) {
       case ACT_WEB:
-        for (byte s = 0; s < maxSockNum; s++) {
+        for (uint8_t s = 0; s < maxSockNum; s++) {
           // close old webserver TCP connections
           if (EthernetClient(s).localPort() != localConfig.tcpPort) {
             disconSocket(s);
@@ -171,7 +177,7 @@ void recvWeb(EthernetClient &client) {
         break;
       case ACT_MAC:
       case ACT_RESET_ETH:
-        for (byte s = 0; s < maxSockNum; s++) {
+        for (uint8_t s = 0; s < maxSockNum; s++) {
           // close all TCP and UDP sockets
           disconSocket(s);
         }
@@ -193,7 +199,7 @@ void recvWeb(EthernetClient &client) {
 void processPost(EthernetClient &client) {
   while (client.available()) {
     char post[POST_SIZE];
-    byte len = 0;
+    uint8_t len = 0;
     while (client.available() && len < sizeof(post) - 1) {
       char c = client.read();
       if (c == '&') break;
@@ -212,8 +218,8 @@ void processPost(EthernetClient &client) {
     }
     if (*paramValue == '\0')
       continue;  // do not process POST parameter if there is no parameter value
-    byte paramKeyByte = strToByte(paramKey);
-    unsigned int paramValueUint = atol(paramValue);
+    uint8_t paramKeyByte = strToByte(paramKey);
+    uint16_t paramValueUint = atol(paramValue);
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
         break;
@@ -235,10 +241,16 @@ void processPost(EthernetClient &client) {
           request[requestLen - 1] = strToByte(paramValue);
         }
         break;
-      case POST_IP ... POST_IP_3:
+      case POST_MAC ... POST_MAC_5:
         {
           action = ACT_RESET_ETH;  // this RESET_ETH is triggered when the user changes anything on the "IP Settings" page.
-          // No need to trigger RESET_ETH for other cases (POST_SUBNET, POST_GATEWAY etc.)
+                                   // No need to trigger RESET_ETH for other cases (POST_SUBNET, POST_GATEWAY etc.)
+                                   // if "Randomize" button is pressed, action is set to ACT_MAC
+          mac[paramKeyByte - POST_MAC] = strToByte(paramValue);
+        }
+        break;
+      case POST_IP ... POST_IP_3:
+        {
           localConfig.ip[paramKeyByte - POST_IP] = byte(paramValueUint);
         }
         break;
@@ -255,7 +267,7 @@ void processPost(EthernetClient &client) {
       case POST_TCP:
         {
           if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from WebUI port
-            for (byte s = 0; s < maxSockNum; s++) {
+            for (uint8_t s = 0; s < maxSockNum; s++) {
               if (EthernetClient(s).localPort() == localConfig.tcpPort) {  // close only Modbus TCP sockets
                 disconSocket(s);
               }
@@ -291,7 +303,7 @@ void processPost(EthernetClient &client) {
           action = ACT_RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
           // No need to trigger RESET_ETH for other cases (POST_DATA, POST_PARITY etc.)
           localConfig.baud = paramValueUint;
-          byte minFrameDelay = byte((frameDelay() / 1000UL) + 1);
+          uint8_t minFrameDelay = byte((frameDelay() / 1000UL) + 1);
           if (localConfig.frameDelay < minFrameDelay) {
             localConfig.frameDelay = minFrameDelay;
           }
@@ -330,19 +342,14 @@ void processPost(EthernetClient &client) {
   }
   switch (action) {
     case ACT_FACTORY:
-      {
-        byte tempMac[3];
-        memcpy(tempMac, localConfig.macEnd, 3);  // keep current MAC
-        localConfig = DEFAULT_CONFIG;
-        memcpy(localConfig.macEnd, tempMac, 3);
-        resetStats();
-        break;
-      }
-    case ACT_MAC:
-      generateMac();
+      localConfig = DEFAULT_CONFIG;
+      resetStats();
       break;
     case ACT_RESET_STATS:
       resetStats();
+      break;
+    case ACT_MAC:
+      generateMac();
       break;
     case ACT_RESET_SERIAL:
       clearQueue();
@@ -370,7 +377,7 @@ void processPost(EthernetClient &client) {
       UDP_REQUEST,     // requestType
       0,               // atts
     });
-    for (byte i = 0; i < requestLen; i++) {
+    for (uint8_t i = 0; i < requestLen; i++) {
       queueData.push(request[i]);
     }
     responseLen = 0;  // clear old Modbus Response from WebUI
@@ -380,10 +387,10 @@ void processPost(EthernetClient &client) {
 }
 
 // takes 2 chars, 1 char + null byte or 1 null byte
-byte strToByte(const char myStr[]) {
+uint8_t strToByte(const char myStr[]) {
   if (!myStr) return 0;
-  byte x = 0;
-  for (byte i = 0; i < 2; i++) {
+  uint8_t x = 0;
+  for (uint8_t i = 0; i < 2; i++) {
     char c = myStr[i];
     if (c >= '0' && c <= '9') {
       x *= 16;
@@ -401,12 +408,12 @@ byte strToByte(const char myStr[]) {
 
 // from https://github.com/RobTillaart/printHelpers
 char __printbuffer[3];
-char *hex(byte val) {
+char *hex(uint8_t val) {
   char *buffer = __printbuffer;
-  byte digits = 2;
+  uint8_t digits = 2;
   buffer[digits] = '\0';
   while (digits > 0) {
-    byte v = val & 0x0F;
+    uint8_t v = val & 0x0F;
     val >>= 4;
     digits--;
     buffer[digits] = (v < 10) ? '0' + v : ('A' - 10) + v;
