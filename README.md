@@ -73,23 +73,16 @@ Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC 
 # Hardware
 Get the hardware (cheap clones from China are sufficient) and connect together:
 
-* **Arduino Nano, Uno or Mega** (and possibly other). On Mega you have to configure Serial in advanced settings in the sketch.
-* **W5100, W5200 or W5500 based Ethernet shield**. The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. !!! ENC28J60 will not work !!!
-* **TTL to RS485 module**:
-  - recommended: TTL to RS485 module with hardware automatic flow control (available on Aliexpress)<br>
-      Arduino <-> Module
-      Tx1 <-> Tx
-      Rx0 <-> Rx<br>
-      
-  - not recommended: MAX485 module with flow controlled by pin (works but is vulnerable to burn outs)<br>
-      Arduino <-> MAX485
-      Tx1 <-> DI
-      Rx0 <-> RO
-      Pin 6 <-> DE,RE
+* **Arduino Nano, Uno or Mega** (and possibly other boards with Atmel chips).<br>On Mega you have to configure Serial in advanced settings in the sketch.
+* **Ethernet shield with WIZnet chip (W5100, W5200 or W5500)**.<br>The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. You can also use combo board MCU + ethernet (such as ATmega328 + W5500 board from Keyestudio).<br>ATTENTION: Ethernet shields with ENC28J60 chip will not work !!!
+* **TTL to RS485 module with an automatic flow direction control**.<br>You can buy cheap modules with MAX3485, MAX13487, SP485 or SP3485 chips (some of these modules are branded as "XY-017", "XY-485", "XY-G485", etc.) from Aliexpress and other marketplaces. Use stabilized external power supply 5V for both Arduino (incl. ethernet shield) and the RS485 module.<br>ATTENTION: Modules with MAX485 chip will work (use pin 6 for DE,RE), but are NOT recommended (no auto-direction, no ESD protection, no hot-swap protection)!!!
+
+<img src="pics/fritzing.png" alt="fritzing" />
+
 
 Here is my HW setup:
-Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn, no longer available) + TTL to RS485 module (HW automatic flow control)
-<img src="pics/HW.jpg" alt="01" style="zoom:100%;" />
+Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn, no longer available) + XY-017 TTL to RS485 module (automatic flow control)
+<img src="pics/HW.jpg" alt="HW" style="zoom:100%;" />
 
 # Firmware
 
@@ -104,7 +97,7 @@ Enjoy :-)
   - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
 
 ## System Info
-<img src="pics/modbus1.png" alt="01" style="zoom:100%;" />
+<img src="pics/modbus1.png" alt="modbus1" style="zoom:100%;" />
 
 **Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
 
@@ -117,7 +110,7 @@ Enjoy :-)
 **MAC Address**. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are random. You can also set manual MAC in IP Settings.
 
 ## Modbus Status
-<img src="pics/modbus2.png" alt="02" style="zoom:100%;" />
+<img src="pics/modbus2.png" alt="modbus2" style="zoom:100%;" />
 
 **Modbus RTU Request**. Send a Modbus RTU request directly from web UI. First byte (slave address) and second byte (function code) are mandatory, no need to calculate CRC. Gateway remembers last request for your convenience.
 
@@ -160,7 +153,7 @@ Enjoy :-)
   - gateway marks the slave as "Slave Responded" if any response is sent by the slave (even error)
 
 ## IP Settings
-<img src="pics/modbus3.png" alt="03" style="zoom:100%;" />
+<img src="pics/modbus3.png" alt="modbus3" style="zoom:100%;" />
 
 **MAC Address**. Change MAC address. "Randomize" button will generate new random MAC (first 3 bytes fixed 90:A2:DA, last 3 bytes will be random).
 
@@ -175,7 +168,7 @@ Enjoy :-)
 **DNS**.\*
 
 ## TCP/UDP Settings
-<img src="pics/modbus4.png" alt="04" style="zoom:100%;" />
+<img src="pics/modbus4.png" alt="modbus4" style="zoom:100%;" />
 
 **Modbus TCP Port**.
 
@@ -188,7 +181,7 @@ Enjoy :-)
 **Modbus TCP Idle Timeout**. Amount of time that a connection is always held alive (open) with no incoming traffic from a Modbus TCP master. This timeout should be longer than polling period (scan rate) set on your Modbus TCP master device.
 
 ## RTU Settings
-<img src="pics/modbus5.png" alt="05" style="zoom:100%;" />
+<img src="pics/modbus5.png" alt="modbus5" style="zoom:100%;" />
 
 **Baud Rate**. Choose baud rate from a pre-aranged list. The list can be adjusted in advanced settings.
 
