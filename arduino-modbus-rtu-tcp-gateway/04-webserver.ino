@@ -19,11 +19,11 @@
 
    ***************************************************************** */
 
-const uint8_t URI_SIZE = 24;   // a smaller buffer for uri
-const uint8_t POST_SIZE = 24;  // a smaller buffer for single post parameter + key
+const byte URI_SIZE = 24;   // a smaller buffer for uri
+const byte POST_SIZE = 24;  // a smaller buffer for single post parameter + key
 
 // Actions that need to be taken after saving configuration.
-enum action_type : uint8_t {
+enum action_type : byte {
   ACT_NONE,
   ACT_FACTORY,        // Load default factory settings (but keep MAC address)
   ACT_MAC,            // Generate new random MAC
@@ -40,7 +40,7 @@ enum action_type action;
 // Pages served by the webserver. Order of elements defines the order in the left menu of the web UI.
 // URL of the page (*.htm) contains number corresponding to its position in this array.
 // The following enum array can have a maximum of 10 elements (incl. PAGE_NONE and PAGE_WAIT)
-enum page : uint8_t {
+enum page : byte {
   PAGE_ERROR,  // 404 Error
   PAGE_INFO,
   PAGE_STATUS,
@@ -54,7 +54,7 @@ enum page : uint8_t {
 // Keys for POST parameters, used in web forms and processed by processPost() function.
 // Using enum ensures unique identification of each POST parameter key and consistence across functions.
 // In HTML code, each element will apear as number corresponding to its position in this array.
-enum post_key : uint8_t {
+enum post_key : byte {
   POST_NONE,  // reserved for NULL
   POST_DHCP,  // enable DHCP
   POST_MAC,
@@ -102,12 +102,12 @@ enum post_key : uint8_t {
   POST_ACTION,    // actions on Tools page
 };
 
-uint8_t request[POST_REQ_LAST - POST_REQ + 1];  // Array to store Modbus request sent from WebUI
-uint8_t requestLen = 0;                         // Length of the Modbus request send from WebUI
+byte request[POST_REQ_LAST - POST_REQ + 1];  // Array to store Modbus request sent from WebUI
+byte requestLen = 0;                         // Length of the Modbus request send from WebUI
 
 
 // Keys for JSON elements, used in: 1) JSON documents, 2) ID of span tags, 3) Javascript.
-enum JSON_type : uint8_t {
+enum JSON_type : byte {
   JSON_TIME,  // Runtime seconds
   JSON_RTU_DATA,
   JSON_ETH_DATA,
@@ -126,7 +126,7 @@ void recvWeb(EthernetClient &client) {
   while (client.available()) {        // start reading the first line which should look like: GET /uri HTTP/1.1
     if (client.read() == ' ') break;  // find space before /uri
   }
-  uint8_t len = 0;
+  byte len = 0;
   while (client.available() && len < sizeof(uri) - 1) {
     char c = client.read();  // parse uri
     if (c == ' ') break;     // find space after /uri
@@ -145,7 +145,7 @@ void recvWeb(EthernetClient &client) {
   }
 
   // Get the requested page from URI
-  uint8_t reqPage = PAGE_ERROR;  // requested page, 404 error is a default
+  byte reqPage = PAGE_ERROR;  // requested page, 404 error is a default
   if (uri[0] == '/') {
     if (uri[1] == '\0')  // the homepage System Info
       reqPage = PAGE_INFO;
@@ -167,7 +167,7 @@ void recvWeb(EthernetClient &client) {
   if (reqPage == PAGE_WAIT) {
     switch (action) {
       case ACT_WEB:
-        for (uint8_t s = 0; s < maxSockNum; s++) {
+        for (byte s = 0; s < maxSockNum; s++) {
           // close old webserver TCP connections
           if (EthernetClient(s).localPort() != localConfig.tcpPort) {
             disconSocket(s);
@@ -177,7 +177,7 @@ void recvWeb(EthernetClient &client) {
         break;
       case ACT_MAC:
       case ACT_RESET_ETH:
-        for (uint8_t s = 0; s < maxSockNum; s++) {
+        for (byte s = 0; s < maxSockNum; s++) {
           // close all TCP and UDP sockets
           disconSocket(s);
         }
@@ -199,7 +199,7 @@ void recvWeb(EthernetClient &client) {
 void processPost(EthernetClient &client) {
   while (client.available()) {
     char post[POST_SIZE];
-    uint8_t len = 0;
+    byte len = 0;
     while (client.available() && len < sizeof(post) - 1) {
       char c = client.read();
       if (c == '&') break;
@@ -218,7 +218,7 @@ void processPost(EthernetClient &client) {
     }
     if (*paramValue == '\0')
       continue;  // do not process POST parameter if there is no parameter value
-    uint8_t paramKeyByte = strToByte(paramKey);
+    byte paramKeyByte = strToByte(paramKey);
     uint16_t paramValueUint = atol(paramValue);
     switch (paramKeyByte) {
       case POST_NONE:  // reserved, because atoi / atol returns NULL in case of error
@@ -267,7 +267,7 @@ void processPost(EthernetClient &client) {
       case POST_TCP:
         {
           if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from WebUI port
-            for (uint8_t s = 0; s < maxSockNum; s++) {
+            for (byte s = 0; s < maxSockNum; s++) {
               if (EthernetClient(s).localPort() == localConfig.tcpPort) {  // close only Modbus TCP sockets
                 disconSocket(s);
               }
@@ -303,7 +303,7 @@ void processPost(EthernetClient &client) {
           action = ACT_RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
           // No need to trigger RESET_ETH for other cases (POST_DATA, POST_PARITY etc.)
           localConfig.baud = paramValueUint;
-          uint8_t minFrameDelay = byte((frameDelay() / 1000UL) + 1);
+          byte minFrameDelay = byte((frameDelay() / 1000UL) + 1);
           if (localConfig.frameDelay < minFrameDelay) {
             localConfig.frameDelay = minFrameDelay;
           }
@@ -377,7 +377,7 @@ void processPost(EthernetClient &client) {
       UDP_REQUEST,     // requestType
       0,               // atts
     });
-    for (uint8_t i = 0; i < requestLen; i++) {
+    for (byte i = 0; i < requestLen; i++) {
       queueData.push(request[i]);
     }
     responseLen = 0;  // clear old Modbus Response from WebUI
@@ -387,10 +387,10 @@ void processPost(EthernetClient &client) {
 }
 
 // takes 2 chars, 1 char + null byte or 1 null byte
-uint8_t strToByte(const char myStr[]) {
+byte strToByte(const char myStr[]) {
   if (!myStr) return 0;
-  uint8_t x = 0;
-  for (uint8_t i = 0; i < 2; i++) {
+  byte x = 0;
+  for (byte i = 0; i < 2; i++) {
     char c = myStr[i];
     if (c >= '0' && c <= '9') {
       x *= 16;
@@ -408,12 +408,12 @@ uint8_t strToByte(const char myStr[]) {
 
 // from https://github.com/RobTillaart/printHelpers
 char __printbuffer[3];
-char *hex(uint8_t val) {
+char *hex(byte val) {
   char *buffer = __printbuffer;
-  uint8_t digits = 2;
+  byte digits = 2;
   buffer[digits] = '\0';
   while (digits > 0) {
-    uint8_t v = val & 0x0F;
+    byte v = val & 0x0F;
     val >>= 4;
     digits--;
     buffer[digits] = (v < 10) ? '0' + v : ('A' - 10) + v;

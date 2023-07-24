@@ -25,9 +25,9 @@
 
    ***************************************************************** */
 
-const uint8_t WEB_OUT_BUFFER_SIZE = 64;  // size of web server write buffer (used by StreamLib)
+const byte WEB_OUT_BUFFER_SIZE = 64;  // size of web server write buffer (used by StreamLib)
 
-void sendPage(EthernetClient &client, uint8_t reqPage) {
+void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[WEB_OUT_BUFFER_SIZE];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
   /*
@@ -54,7 +54,7 @@ An advantage of HTTP 1.1 is
                     "\r\n"));
     chunked.begin();
     chunked.print(F("{"));
-    for (uint8_t i = 0; i < JSON_LAST; i++) {
+    for (byte i = 0; i < JSON_LAST; i++) {
       if (i) chunked.print(F(","));
       chunked.print(F("\""));
       chunked.print(i);
@@ -145,7 +145,7 @@ An advantage of HTTP 1.1 is
                   "<div class=m>"));
 
   // Left Menu
-  for (uint8_t i = 1; i < PAGE_WAIT; i++) {  // PAGE_WAIT is the last item in enum
+  for (byte i = 1; i < PAGE_WAIT; i++) {  // PAGE_WAIT is the last item in enum
     chunked.print(F("<h4 "));
     if ((i) == reqPage) {
       chunked.print(F(" style=background-color:#FF6600"));
@@ -233,7 +233,7 @@ void contentInfo(ChunkedPrint &chunked) {
   chunked.print(maxSockNum);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("MAC Address"));
-  for (uint8_t i = 0; i < 6; i++) {
+  for (byte i = 0; i < 6; i++) {
     chunked.print(hex(mac[i]));
     if (i < 5) chunked.print(F(":"));
   }
@@ -272,10 +272,10 @@ void contentStatus(ChunkedPrint &chunked) {
 #endif /* ENABLE_EXTRA_DIAG */
 
   tagLabelDiv(chunked, F("Modbus RTU Request"));
-  for (uint8_t i = 0; i <= POST_REQ_LAST - POST_REQ; i++) {
+  for (byte i = 0; i <= POST_REQ_LAST - POST_REQ; i++) {
     bool required = false;
     bool printVal = false;
-    uint8_t value;
+    byte value;
     if (i == 0 || i == 1) {
       required = true;  // first byte (slave address) and second byte (function code) are required
     }
@@ -312,7 +312,7 @@ void contentStatus(ChunkedPrint &chunked) {
 void contentIp(ChunkedPrint &chunked) {
 
   tagLabelDiv(chunked, F("MAC Address"));
-  for (uint8_t i = 0; i < 6; i++) {
+  for (byte i = 0; i < 6; i++) {
     tagInputHex(chunked, POST_MAC + i, true, true, mac[i]);
     if (i < 5) chunked.print(F(":"));
   }
@@ -332,8 +332,8 @@ void contentIp(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 #endif /* ENABLE_DHCP */
 
-  uint8_t *tempIp;
-  for (uint8_t j = 0; j < 3; j++) {
+  byte *tempIp;
+  for (byte j = 0; j < 3; j++) {
     switch (j) {
       case 0:
         tagLabelDiv(chunked, F("Static IP"));
@@ -363,7 +363,7 @@ void contentIp(ChunkedPrint &chunked) {
 //            TCP/UDP Settings
 void contentTcp(ChunkedPrint &chunked) {
   uint16_t value;
-  for (uint8_t i = 0; i < 3; i++) {
+  for (byte i = 0; i < 3; i++) {
     switch (i) {
       case 0:
         tagLabelDiv(chunked, F("Modbus TCP Port"));
@@ -387,7 +387,7 @@ void contentTcp(ChunkedPrint &chunked) {
   chunked.print(F("<select name="));
   chunked.print(POST_RTU_OVER, HEX);
   chunked.print(F(">"));
-  for (uint8_t i = 0; i < 2; i++) {
+  for (byte i = 0; i < 2; i++) {
     chunked.print(F("<option value="));
     chunked.print(i);
     if (localConfig.enableRtuOverTcp == i) chunked.print(F(" selected"));
@@ -417,7 +417,7 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("<select class=s name="));
   chunked.print(POST_BAUD, HEX);
   chunked.print(F(">"));
-  for (uint8_t i = 0; i < (sizeof(BAUD_RATES) / 2); i++) {
+  for (byte i = 0; i < (sizeof(BAUD_RATES) / 2); i++) {
     chunked.print(F("<option value="));
     chunked.print(BAUD_RATES[i]);
     if (localConfig.baud == BAUD_RATES[i]) chunked.print(F(" selected"));
@@ -431,7 +431,7 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("<select name="));
   chunked.print(POST_DATA, HEX);
   chunked.print(F(">"));
-  for (uint8_t i = 5; i <= 8; i++) {
+  for (byte i = 5; i <= 8; i++) {
     chunked.print(F("<option value="));
     chunked.print(i);
     if ((((localConfig.serialConfig & 0x06) >> 1) + 5) == i) chunked.print(F(" selected"));
@@ -445,7 +445,7 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("<select name="));
   chunked.print(POST_PARITY, HEX);
   chunked.print(F(">"));
-  for (uint8_t i = 0; i <= 3; i++) {
+  for (byte i = 0; i <= 3; i++) {
     if (i == 1) continue;  // invalid value, skip and continue for loop
     chunked.print(F("<option value="));
     chunked.print(i);
@@ -472,7 +472,7 @@ void contentRtu(ChunkedPrint &chunked) {
   chunked.print(F("<select name="));
   chunked.print(POST_STOP, HEX);
   chunked.print(F(">"));
-  for (uint8_t i = 1; i <= 2; i++) {
+  for (byte i = 1; i <= 2; i++) {
     chunked.print(F("<option value="));
     chunked.print(i);
     if ((((localConfig.serialConfig & 0x08) >> 3) + 1) == i) chunked.print(F(" selected"));
@@ -500,7 +500,7 @@ void contentWait(ChunkedPrint &chunked) {
 
 // Functions providing snippets of repetitive HTML code
 
-void tagInputNumber(ChunkedPrint &chunked, const uint8_t name, const uint8_t min, uint16_t max, uint16_t value, const __FlashStringHelper *units) {
+void tagInputNumber(ChunkedPrint &chunked, const byte name, const byte min, uint16_t max, uint16_t value, const __FlashStringHelper *units) {
   chunked.print(F("<input class='s n' required type=number name="));
   chunked.print(name, HEX);
   chunked.print(F(" min="));
@@ -517,8 +517,8 @@ void tagInputNumber(ChunkedPrint &chunked, const uint8_t name, const uint8_t min
   chunked.print(units);
 }
 
-void tagInputIp(ChunkedPrint &chunked, const uint8_t name, uint8_t ip[]) {
-  for (uint8_t i = 0; i < 4; i++) {
+void tagInputIp(ChunkedPrint &chunked, const byte name, byte ip[]) {
+  for (byte i = 0; i < 4; i++) {
     chunked.print(F("<input name="));
     chunked.print(name + i, HEX);
     chunked.print(F(" class='p i' required maxlength=3 pattern='^(&bsol;d{1,2}|1&bsol;d&bsol;d|2[0-4]&bsol;d|25[0-5])$' value="));
@@ -528,7 +528,7 @@ void tagInputIp(ChunkedPrint &chunked, const uint8_t name, uint8_t ip[]) {
   }
 }
 
-void tagInputHex(ChunkedPrint &chunked, const uint8_t name, const bool required, const bool printVal, const uint8_t value) {
+void tagInputHex(ChunkedPrint &chunked, const byte name, const bool required, const bool printVal, const byte value) {
   chunked.print(F("<input name="));
   chunked.print(name, HEX);
   if (required) {
@@ -549,7 +549,7 @@ void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
                   "<div>"));
 }
 
-void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, uint8_t value) {
+void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, byte value) {
   chunked.print(F(" <button name="));
   chunked.print(POST_ACTION, HEX);
   chunked.print(F(" value="));
@@ -564,7 +564,7 @@ void tagDivClose(ChunkedPrint &chunked) {
                   "</div>"));  // <div class=r>
 }
 
-void tagSpan(ChunkedPrint &chunked, const uint8_t JSONKEY) {
+void tagSpan(ChunkedPrint &chunked, const byte JSONKEY) {
   chunked.print(F("<span id="));
   chunked.print(JSONKEY);
   chunked.print(F(">"));
@@ -573,7 +573,7 @@ void tagSpan(ChunkedPrint &chunked, const uint8_t JSONKEY) {
 }
 
 // Menu item strings
-void stringPageName(ChunkedPrint &chunked, uint8_t item) {
+void stringPageName(ChunkedPrint &chunked, byte item) {
   switch (item) {
     case PAGE_INFO:
       chunked.print(F("System Info"));
@@ -595,7 +595,7 @@ void stringPageName(ChunkedPrint &chunked, uint8_t item) {
   }
 }
 
-void stringStats(ChunkedPrint &chunked, const uint8_t stat) {
+void stringStats(ChunkedPrint &chunked, const byte stat) {
   switch (stat) {
     case SLAVE_OK:
       chunked.print(F(" Slave Responded"));
@@ -625,7 +625,7 @@ void stringStats(ChunkedPrint &chunked, const uint8_t stat) {
   chunked.print(F("<br>"));
 }
 
-void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
+void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
   switch (JSONKEY) {
 #ifdef ENABLE_EXTRA_DIAG
     case JSON_TIME:
@@ -639,7 +639,7 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
       chunked.print(F(" secs"));
       break;
     case JSON_RTU_DATA:
-      for (uint8_t i = 0; i < DATA_LAST; i++) {
+      for (byte i = 0; i < DATA_LAST; i++) {
         chunked.print(rtuCount[i]);
         switch (i) {
           case DATA_TX:
@@ -651,7 +651,7 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
         }
       }
     case JSON_ETH_DATA:
-      for (uint8_t i = 0; i < DATA_LAST; i++) {
+      for (byte i = 0; i < DATA_LAST; i++) {
         chunked.print(ethCount[i]);
         switch (i) {
           case DATA_TX:
@@ -666,7 +666,7 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
 #endif /* ENABLE_EXTRA_DIAG */
     case JSON_RESPONSE:
       {
-        for (uint8_t i = 0; i < MAX_RESPONSE_LEN; i++) {
+        for (byte i = 0; i < MAX_RESPONSE_LEN; i++) {
           chunked.print(F("<input value='"));
           if (i < responseLen) {
             chunked.print(hex(response[i]));
@@ -694,7 +694,7 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
       queueHeadersSize = queueHeaders.size();
       break;
     case JSON_STATS:
-      for (uint8_t i = 0; i < ERROR_LAST; i++) {
+      for (byte i = 0; i < ERROR_LAST; i++) {
         if (i == SLAVE_ERROR_0B_QUEUE) continue;  // there is no counter for SLAVE_ERROR_0B_QUEUE
         chunked.print(errorCount[i]);
         stringStats(chunked, i);
@@ -702,8 +702,8 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
       break;
     case JSON_TCP_UDP_MASTERS:
       {
-        for (uint8_t s = 0; s < maxSockNum; s++) {
-          uint8_t remoteIParray[4];
+        for (byte s = 0; s < maxSockNum; s++) {
+          byte remoteIParray[4];
           W5100.readSnDIPR(s, remoteIParray);
           if (remoteIParray[0] != 0) {
             if (W5100.readSnSR(s) == SnSR::UDP) {
@@ -719,8 +719,8 @@ void jsonVal(ChunkedPrint &chunked, const uint8_t JSONKEY) {
       break;
     case JSON_SLAVES:
       {
-        for (uint8_t k = 1; k < MAX_SLAVES; k++) {
-          for (uint8_t s = 0; s <= SLAVE_ERROR_0B_QUEUE; s++) {
+        for (byte k = 1; k < MAX_SLAVES; k++) {
+          for (byte s = 0; s <= SLAVE_ERROR_0B_QUEUE; s++) {
             if (getSlaveStatus(k, s) == true || k == scanCounter) {
               chunked.print(hex(k));
               chunked.print(F("h"));

@@ -30,7 +30,7 @@ void sendSerial() {
     case 0:  // IDLE: Optimize queue (prioritize requests from responding slaves) and trigger sending via serial
       while (priorityReqInQueue && (queueHeaders.first().requestType & PRIORITY_REQUEST) == false) {
         // move requests to non responding slaves to the tail of the queue
-        for (uint8_t i = 0; i < queueHeaders.first().msgLen; i++) {
+        for (byte i = 0; i < queueHeaders.first().msgLen; i++) {
           queueData.push(queueData.shift());
         }
         queueHeaders.push(queueHeaders.shift());
@@ -93,17 +93,17 @@ void sendSerial() {
         } else if (myHeader.atts >= localConfig.serialAttempts) {
           // send modbus error 0x0B (Gateway Target Device Failed to Respond) - usually means that target device (address) is not present
           setSlaveStatus(queueData[0], SLAVE_ERROR_0B, true, false);
-          uint8_t MBAP[] = { myHeader.tid[0],
-                             myHeader.tid[1],
-                             0x00,
-                             0x00,
-                             0x00,
-                             0x03 };
-          uint8_t PDU[5] = { queueData[0],
-                             byte(queueData[1] + 0x80),
-                             0x0B };
+          byte MBAP[] = { myHeader.tid[0],
+                          myHeader.tid[1],
+                          0x00,
+                          0x00,
+                          0x00,
+                          0x03 };
+          byte PDU[5] = { queueData[0],
+                          byte(queueData[1] + 0x80),
+                          0x0B };
           crc = 0xFFFF;
-          for (uint8_t i = 0; i < 3; i++) {
+          for (byte i = 0; i < 3; i++) {
             calculateCRC(PDU[i]);
           }
           PDU[3] = lowByte(crc);  // send CRC, low byte first
@@ -124,9 +124,9 @@ void sendSerial() {
 
 void recvSerial() {
   static uint16_t rxNdx = 0;
-  static uint8_t serialIn[MODBUS_SIZE];
+  static byte serialIn[MODBUS_SIZE];
   while (mySerial.available() > 0) {
-    uint8_t b = mySerial.read();
+    byte b = mySerial.read();
     if (rxNdx < MODBUS_SIZE) {
       serialIn[rxNdx] = b;
       rxNdx++;
@@ -144,7 +144,7 @@ void recvSerial() {
       } else {
         setSlaveStatus(serialIn[0], SLAVE_OK, true, myHeader.requestType & SCAN_REQUEST);
       }
-      uint8_t MBAP[] = {
+      byte MBAP[] = {
         myHeader.tid[0],
         myHeader.tid[1],
         0x00,
@@ -164,7 +164,7 @@ void recvSerial() {
   }
 }
 
-void sendResponse(const uint8_t MBAP[], const uint8_t PDU[], const uint16_t pduLength) {
+void sendResponse(const byte MBAP[], const byte PDU[], const uint16_t pduLength) {
   header myHeader = queueHeaders.first();
   responseLen = 0;
   while (responseLen < pduLength) {  // include CRC
@@ -186,7 +186,7 @@ void sendResponse(const uint8_t MBAP[], const uint8_t PDU[], const uint16_t pduL
     if (!localConfig.enableRtuOverTcp) ethCount[DATA_TX] += 4;
 #endif /* ENABLE_EXTRA_DIAG */
   } else if (myHeader.requestType & TCP_REQUEST) {
-    uint8_t sock = myHeader.requestType & TCP_REQUEST_MASK;
+    byte sock = myHeader.requestType & TCP_REQUEST_MASK;
     EthernetClient client = EthernetClient(sock);
     if (W5100.readSnSR(sock) == SnSR::ESTABLISHED && W5100.readSnDPORT(sock) == myHeader.remPort) {  // Check remote port should be enough or check also rem IP?
       if (localConfig.enableRtuOverTcp) client.write(PDU, pduLength);
@@ -203,9 +203,9 @@ void sendResponse(const uint8_t MBAP[], const uint8_t PDU[], const uint16_t pduL
   deleteRequest();
 }
 
-bool checkCRC(uint8_t buf[], int16_t len) {
+bool checkCRC(byte buf[], int16_t len) {
   crc = 0xFFFF;
-  for (uint8_t i = 0; i < len - 2; i++) {
+  for (byte i = 0; i < len - 2; i++) {
     calculateCRC(buf[i]);
   }
   if (highByte(crc) == buf[len - 1] && lowByte(crc) == buf[len - 2]) {
@@ -215,11 +215,11 @@ bool checkCRC(uint8_t buf[], int16_t len) {
   }
 }
 
-void calculateCRC(uint8_t b) {
-  crc ^= (uint16_t)b;                 // XOR byte into least sig. byte of crc
-  for (uint8_t i = 8; i != 0; i--) {  // Loop over each bit
-    if ((crc & 0x0001) != 0) {        // If the LSB is set
-      crc >>= 1;                      // Shift right and XOR 0xA001
+void calculateCRC(byte b) {
+  crc ^= (uint16_t)b;              // XOR byte into least sig. byte of crc
+  for (byte i = 8; i != 0; i--) {  // Loop over each bit
+    if ((crc & 0x0001) != 0) {     // If the LSB is set
+      crc >>= 1;                   // Shift right and XOR 0xA001
       crc ^= 0xA001;
     } else        // Else LSB is not set
       crc >>= 1;  // Just shift right

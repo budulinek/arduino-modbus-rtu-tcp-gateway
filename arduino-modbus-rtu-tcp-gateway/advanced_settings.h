@@ -6,28 +6,28 @@
 #define mySerial Serial  // define serial port for RS485 interface, for Arduino Mega choose from Serial1, Serial2 or Serial3
 // List of baud rates (divided by 100) available in WebUI. Feel free to add your custom baud rate (anything between 3 and 2500)
 const uint16_t BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
-#define RS485_CONTROL_PIN 6                 // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
-const uint8_t MAX_QUEUE_REQUESTS = 10;      // max number of TCP or UDP requests stored in a queue
-const uint16_t MAX_QUEUE_DATA = 256;        // total length of TCP or UDP requests stored in a queue (in bytes)
-const uint16_t MAX_SLAVES = 247;            // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
-const uint16_t MODBUS_SIZE = 256;           // size of a MODBUS RTU frame (determines size of various buffers)
-const uint8_t MAX_RESPONSE_LEN = 16;        // Max length (bytes) of the Modbus response shown in WebUI
-const uint8_t SCAN_FUNCTION_FIRST = 0x03;   // Function code sent during Modbus RTU Scan request (first attempt)
-const uint8_t SCAN_FUNCTION_SECOND = 0x04;  // Function code sent during Modbus RTU Scan request (second attempt)
-const uint8_t SCAN_DATA_ADDRESS = 0x01;     // Data address sent during Modbus RTU Scan request (both attempts)
-const uint16_t SCAN_TIMEOUT = 200;          // Timeout (ms) for Modbus scan requests
+#define RS485_CONTROL_PIN 6              // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
+const byte MAX_QUEUE_REQUESTS = 10;      // max number of TCP or UDP requests stored in a queue
+const uint16_t MAX_QUEUE_DATA = 256;     // total length of TCP or UDP requests stored in a queue (in bytes)
+const uint16_t MAX_SLAVES = 247;         // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
+const uint16_t MODBUS_SIZE = 256;        // size of a MODBUS RTU frame (determines size of various buffers)
+const byte MAX_RESPONSE_LEN = 16;        // Max length (bytes) of the Modbus response shown in WebUI
+const byte SCAN_FUNCTION_FIRST = 0x03;   // Function code sent during Modbus RTU Scan request (first attempt)
+const byte SCAN_FUNCTION_SECOND = 0x04;  // Function code sent during Modbus RTU Scan request (second attempt)
+const byte SCAN_DATA_ADDRESS = 0x01;     // Data address sent during Modbus RTU Scan request (both attempts)
+const uint16_t SCAN_TIMEOUT = 200;       // Timeout (ms) for Modbus scan requests
 
-const uint8_t MAC_START[3] = { 0x90, 0xA2, 0xDA };  // MAC range for Gheo SA
-const uint8_t ETH_RESET_PIN = 7;                    // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
-const uint16_t ETH_RESET_DELAY = 500;               // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
-const uint16_t WEB_IDLE_TIMEOUT = 400;              // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
-const uint16_t TCP_DISCON_TIMEOUT = 500;            // Timeout (ms) for client DISCON socket command, non-blocking alternative to https://www.arduino.cc/reference/en/libraries/ethernet/client.setconnectiontimeout/
-const uint16_t TCP_RETRANSMISSION_TIMEOUT = 50;     // Ethernet controller’s timeout (ms), blocking (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissiontimeout/)
-const uint8_t TCP_RETRANSMISSION_COUNT = 3;         // Number of transmission attempts the Ethernet controller will make before giving up (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissioncount/)
-const uint16_t FETCH_INTERVAL = 2000;               // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
+const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };  // MAC range for Gheo SA
+const byte ETH_RESET_PIN = 7;                    // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
+const uint16_t ETH_RESET_DELAY = 500;            // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
+const uint16_t WEB_IDLE_TIMEOUT = 400;           // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
+const uint16_t TCP_DISCON_TIMEOUT = 500;         // Timeout (ms) for client DISCON socket command, non-blocking alternative to https://www.arduino.cc/reference/en/libraries/ethernet/client.setconnectiontimeout/
+const uint16_t TCP_RETRANSMISSION_TIMEOUT = 50;  // Ethernet controller’s timeout (ms), blocking (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissiontimeout/)
+const byte TCP_RETRANSMISSION_COUNT = 3;         // Number of transmission attempts the Ethernet controller will make before giving up (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissioncount/)
+const uint16_t FETCH_INTERVAL = 2000;            // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
 
-const uint8_t CONFIG_START = 96;    // Start address where config and counters are saved in EEPROM
-const uint8_t EEPROM_INTERVAL = 6;  // Interval (hours) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
+const byte CONFIG_START = 96;    // Start address where config and counters are saved in EEPROM
+const byte EEPROM_INTERVAL = 6;  // Interval (hours) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
 
 /****** EXTRA FUNCTIONS ******/
 
