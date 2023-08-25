@@ -8,9 +8,10 @@
 const uint16_t BAUD_RATES[] = { 3, 6, 9, 12, 24, 48, 96, 192, 384, 576, 1152 };
 #define RS485_CONTROL_PIN 6              // Arduino Pin for RS485 Direction control, disable if you have module with hardware flow control
 const byte MAX_QUEUE_REQUESTS = 10;      // max number of TCP or UDP requests stored in a queue
-const uint16_t MAX_QUEUE_DATA = 256;     // total length of TCP or UDP requests stored in a queue (in bytes)
+const uint16_t MAX_QUEUE_DATA = 254;     // total length of TCP or UDP requests stored in a queue (in bytes),
+                                         // should be at least MODBUS_SIZE - 2 (CRC is not stored in queue)
 const uint16_t MAX_SLAVES = 247;         // max number of Modbus slaves (Modbus supports up to 247 slaves, the rest is for reserved addresses)
-const uint16_t MODBUS_SIZE = 256;        // size of a MODBUS RTU frame (determines size of various buffers)
+const uint16_t MODBUS_SIZE = 256;        // maximum size of a MODBUS RTU frame incl slave address and CRC (determines size of various buffers)
 const byte MAX_RESPONSE_LEN = 16;        // Max length (bytes) of the Modbus response shown in WebUI
 const byte SCAN_FUNCTION_FIRST = 0x03;   // Function code sent during Modbus RTU Scan request (first attempt)
 const byte SCAN_FUNCTION_SECOND = 0x04;  // Function code sent during Modbus RTU Scan request (second attempt)
@@ -26,7 +27,7 @@ const uint16_t TCP_RETRANSMISSION_TIMEOUT = 50;  // Ethernet controller’s time
 const byte TCP_RETRANSMISSION_COUNT = 3;         // Number of transmission attempts the Ethernet controller will make before giving up (see https://www.arduino.cc/reference/en/libraries/ethernet/ethernet.setretransmissioncount/)
 const uint16_t FETCH_INTERVAL = 2000;            // Fetch API interval (ms) for the Modbus Status webpage to renew data from JSON served by Arduino
 
-const byte CONFIG_START = 96;    // Start address where config and counters are saved in EEPROM
+const byte DATA_START = 96;      // Start address where config and counters are saved in EEPROM
 const byte EEPROM_INTERVAL = 6;  // Interval (hours) for saving Modbus statistics to EEPROM (in order to minimize writes to EEPROM)
 
 /****** EXTRA FUNCTIONS ******/
@@ -45,7 +46,7 @@ const byte EEPROM_INTERVAL = 6;  // Interval (hours) for saving Modbus statistic
 
   You can change default factory settings bellow, but do not delete (comment out) individual lines! 
 */
-const config_type DEFAULT_CONFIG = {
+const config_t DEFAULT_CONFIG = {
   { 192, 168, 1, 254 },  // Static IP
   { 255, 255, 255, 0 },  // Submask
   { 192, 168, 1, 1 },    // Gateway
@@ -60,5 +61,5 @@ const config_type DEFAULT_CONFIG = {
   SERIAL_8E1,            // Serial Config (Data Bits, Parity, Stop bits), Modbus RTU default is 8E1, another frequently used option is 8N2
   150,                   // Inter-frame Delay (byte)
   500,                   // Response Timeout
-  3                      // Attempts (byte)
+  3,                     // Attempts (byte)
 };

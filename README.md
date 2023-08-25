@@ -11,6 +11,7 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
   - [IP Settings](#ip-settings)
   - [TCP/UDP Settings](#tcpudp-settings)
   - [RTU Settings](#rtu-settings)
+  - [Tools](#tools)
 * [Integration](#integration)
   - [Loxone](#loxone)
   - [Home Assistant](#home-assistant)
@@ -73,22 +74,25 @@ Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC 
 # Hardware
 Get the hardware (cheap clones from China are sufficient) and connect together:
 
-* **Arduino Nano, Uno or Mega** (and possibly other boards with Atmel chips).<br>On Mega you have to configure Serial in advanced settings in the sketch.
+* **Arduino Nano, Uno or Mega** (and possibly other boards with ATmega chips).<br>On Mega you have to configure Serial in advanced settings in the sketch.
 * **Ethernet shield with WIZnet chip (W5100, W5200 or W5500)**.<br>The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. You can also use combo board MCU + ethernet (such as ATmega328 + W5500 board from Keyestudio).<br>ATTENTION: Ethernet shields with ENC28J60 chip will not work !!!
-* **TTL to RS485 module with an automatic flow direction control**.<br>You can buy cheap modules with MAX3485, MAX13487, SP485 or SP3485 chips (some of these modules are branded as "XY-017", "XY-485", "XY-G485", etc.) from Aliexpress and other marketplaces. Use stabilized external power supply 5V for both Arduino (incl. ethernet shield) and the RS485 module.<br>ATTENTION: Modules with MAX485 chip will work (use pin 6 for DE,RE), but are NOT recommended (no auto-direction, no ESD protection, no hot-swap protection)!!!
+* **TTL to RS485 module with an automatic flow direction control**.<br>You can buy cheap modules with MAX3485, MAX13487, SP485 or SP3485 chips (some of these modules are branded as "XY-017", "XY-485", "XY-G485", etc.) from Aliexpress and other marketplaces.<br>ATTENTION: Modules with MAX485 chip will work (use pin 6 for DE+RE), but are NOT recommended (no auto-direction, no ESD protection, no hot-swap protection) !!!
+* **External power supply**.<br>Use regulated 5V external power supply for both the Arduino (+ the ethernet shield) and the RS485 module.<br>ATTENTION: By using the 5V pin, you are bypassing Arduino's built-in voltage regulator and reverse-polarity protection curcuit. Make sure your external power supply does not exceed 5,5V !!!
 
 <img src="pics/fritzing.png" alt="fritzing" />
 
 
 Here is my HW setup:
-Terminal shield + Arduino Nano + W5500 ethernet shield (RobotDyn, no longer available) + XY-017 TTL to RS485 module (automatic flow control)
+Terminal shield + Arduino Nano + W5500 ethernet shield (from RobotDyn, no longer available) + TTL to RS485 module (automatic flow control)
 <img src="pics/HW.jpg" alt="HW" style="zoom:100%;" />
 
 # Firmware
 
 You can either:
-- ** Download and flash my pre-compiled firmware** from "Releases".
-- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. Download all required libraries (they are available in "library manager"). If you want, you can check the default factory settings (can be later changed via web interface) and advanced settings (can only be changed in the sketch). Compile and upload your program to Arduino.
+- **Download and flash my pre-compiled firmware** from "Releases".
+- **Compile your own firmware**. Download this repository (all *.ino files) and open arduino-modbus-rtu-tcp-gateway.ino in Arduino IDE. If you want, you can check advanced_settings.h for advanced settings (can only be changed in the sketch) and for default factory settings (can be later changed via web interface). Download all required libraries, compile and upload your program to Arduino. The program uses the following external libraries (all are available in Arduino IDE's "library manager"):
+ - CircularBuffer (https://github.com/rlogiacco/CircularBuffer)
+ - StreamLib (https://github.com/jandrassy/StreamLib)
 
 Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
 Enjoy :-)
@@ -99,13 +103,11 @@ Enjoy :-)
 ## System Info
 <img src="pics/modbus1.png" alt="modbus1" style="zoom:100%;" />
 
-**Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
-
-**Reboot**.
-
 **EEPROM Health**. Keeps track of EEPROM write cycles (this counter is persistent, never cleared during factory resets). Replace your Arduino once you reach 100 000 write cycles (with 6 hours EEPROM_INTERVAL you have more than 50 years lifespan).
 
 **Ethernet Sockets**. Max number of usable sockets. See Limitations bellow. One socket is reserved for Modbus UDP, remaining sockets are shared between Modbus TCP and WebUI.
+
+**Ethernet Chip**. Wiznet chip on the ethernet shield.
 
 **MAC Address**. First 3 bytes are fixed 90:A2:DA, remaining 3 bytes are random. You can also set manual MAC in IP Settings.
 
@@ -196,6 +198,13 @@ Enjoy :-)
 **Response Timeout**. Timeout for Modbus RTU response. Increase Response Timeout if you see Response Timeouts in Modbus statistics.
 
 **Attempts**. Number of attempts before error (Code 11) is sent back to the Modbus TCP/UDP master.
+
+## Tools
+<img src="pics/modbus6.png" alt="modbus6" style="zoom:100%;" />
+
+**Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
+
+**Reboot**.
 
 # Integration
 

@@ -10,7 +10,7 @@
 
    processPost()
    - processes POST data from forms and buttons
-   - updates localConfig (in RAM)
+   - updates data.config (in RAM)
    - saves config into EEPROM
    - executes actions which do not require webserver restart
 
@@ -25,7 +25,7 @@ const byte POST_SIZE = 24;  // a smaller buffer for single post parameter + key
 // Actions that need to be taken after saving configuration.
 enum action_type : byte {
   ACT_NONE,
-  ACT_FACTORY,        // Load default factory settings (but keep MAC address)
+  ACT_DEFAULT,        // Load default factory settings (but keep MAC address)
   ACT_MAC,            // Generate new random MAC
   ACT_REBOOT,         // Reboot the microcontroller
   ACT_RESET_ETH,      // Ethernet reset
@@ -47,6 +47,7 @@ enum page : byte {
   PAGE_IP,
   PAGE_TCP,
   PAGE_RTU,
+  PAGE_TOOLS,
   PAGE_WAIT,  // page with "Reloading. Please wait..." message.
   PAGE_DATA,  // data.json
 };
@@ -112,7 +113,7 @@ enum JSON_type : byte {
   JSON_RTU_DATA,
   JSON_ETH_DATA,
   JSON_RESPONSE,
-  JSON_STATS,  // Modbus statistics from array errorCount[]
+  JSON_STATS,  // Modbus statistics from array data.errorCnt[]
   JSON_QUEUE,
   JSON_TCP_UDP_MASTERS,  // list of Modbus TCP/UDP masters separated by <br>
   JSON_SLAVES,           // list of Modbus RTU slaves separated by <br>
@@ -157,7 +158,7 @@ void recvWeb(EthernetClient &client) {
     }
   }
   // Actions that require "please wait" page
-  if (action == ACT_WEB || action == ACT_MAC || action == ACT_RESET_ETH || action == ACT_REBOOT || action == ACT_FACTORY) {
+  if (action == ACT_WEB || action == ACT_MAC || action == ACT_RESET_ETH || action == ACT_REBOOT || action == ACT_DEFAULT) {
     reqPage = PAGE_WAIT;
   }
   // Send page
@@ -169,11 +170,11 @@ void recvWeb(EthernetClient &client) {
       case ACT_WEB:
         for (byte s = 0; s < maxSockNum; s++) {
           // close old webserver TCP connections
-          if (EthernetClient(s).localPort() != localConfig.tcpPort) {
+          if (EthernetClient(s).localPort() != data.config.tcpPort) {
             disconSocket(s);
           }
         }
-        webServer = EthernetServer(localConfig.webPort);
+        webServer = EthernetServer(data.config.webPort);
         break;
       case ACT_MAC:
       case ACT_RESET_ETH:
@@ -184,7 +185,7 @@ void recvWeb(EthernetClient &client) {
         startEthernet();
         break;
       case ACT_REBOOT:
-      case ACT_FACTORY:
+      case ACT_DEFAULT:
         resetFunc();
         break;
       default:
@@ -194,7 +195,7 @@ void recvWeb(EthernetClient &client) {
   action = ACT_NONE;
 }
 
-// This function stores POST parameter values in localConfig.
+// This function stores POST parameter values in data.config.
 // Most changes are saved and applied immediatelly, some changes (IP settings, web server port, reboot) are saved but applied later after "please wait" page is sent.
 void processPost(EthernetClient &client) {
   while (client.available()) {
@@ -226,12 +227,12 @@ void processPost(EthernetClient &client) {
 #ifdef ENABLE_DHCP
       case POST_DHCP:
         {
-          localConfig.enableDhcp = byte(paramValueUint);
+          data.config.enableDhcp = byte(paramValueUint);
         }
         break;
       case POST_DNS ... POST_DNS_3:
         {
-          localConfig.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
+          data.config.dns[paramKeyByte - POST_DNS] = byte(paramValueUint);
         }
         break;
 #endif /* ENABLE_DHCP */
@@ -246,92 +247,92 @@ void processPost(EthernetClient &client) {
           action = ACT_RESET_ETH;  // this RESET_ETH is triggered when the user changes anything on the "IP Settings" page.
                                    // No need to trigger RESET_ETH for other cases (POST_SUBNET, POST_GATEWAY etc.)
                                    // if "Randomize" button is pressed, action is set to ACT_MAC
-          mac[paramKeyByte - POST_MAC] = strToByte(paramValue);
+          data.mac[paramKeyByte - POST_MAC] = strToByte(paramValue);
         }
         break;
       case POST_IP ... POST_IP_3:
         {
-          localConfig.ip[paramKeyByte - POST_IP] = byte(paramValueUint);
+          data.config.ip[paramKeyByte - POST_IP] = byte(paramValueUint);
         }
         break;
       case POST_SUBNET ... POST_SUBNET_3:
         {
-          localConfig.subnet[paramKeyByte - POST_SUBNET] = byte(paramValueUint);
+          data.config.subnet[paramKeyByte - POST_SUBNET] = byte(paramValueUint);
         }
         break;
       case POST_GATEWAY ... POST_GATEWAY_3:
         {
-          localConfig.gateway[paramKeyByte - POST_GATEWAY] = byte(paramValueUint);
+          data.config.gateway[paramKeyByte - POST_GATEWAY] = byte(paramValueUint);
         }
         break;
       case POST_TCP:
         {
-          if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from WebUI port
+          if (paramValueUint != data.config.webPort && paramValueUint != data.config.tcpPort) {  // continue only of the value changed and it differs from WebUI port
             for (byte s = 0; s < maxSockNum; s++) {
-              if (EthernetClient(s).localPort() == localConfig.tcpPort) {  // close only Modbus TCP sockets
+              if (EthernetClient(s).localPort() == data.config.tcpPort) {  // close only Modbus TCP sockets
                 disconSocket(s);
               }
             }
-            localConfig.tcpPort = paramValueUint;
-            modbusServer = EthernetServer(localConfig.tcpPort);
+            data.config.tcpPort = paramValueUint;
+            modbusServer = EthernetServer(data.config.tcpPort);
           }
         }
         break;
       case POST_UDP:
         {
-          localConfig.udpPort = paramValueUint;
+          data.config.udpPort = paramValueUint;
           Udp.stop();
-          Udp.begin(localConfig.udpPort);
+          Udp.begin(data.config.udpPort);
         }
         break;
       case POST_WEB:
         {
-          if (paramValueUint != localConfig.webPort && paramValueUint != localConfig.tcpPort) {  // continue only of the value changed and it differs from Modbus TCP port
-            localConfig.webPort = paramValueUint;
+          if (paramValueUint != data.config.webPort && paramValueUint != data.config.tcpPort) {  // continue only of the value changed and it differs from Modbus TCP port
+            data.config.webPort = paramValueUint;
             action = ACT_WEB;
           }
         }
         break;
       case POST_RTU_OVER:
-        localConfig.enableRtuOverTcp = byte(paramValueUint);
+        data.config.enableRtuOverTcp = byte(paramValueUint);
         break;
       case POST_TCP_TIMEOUT:
-        localConfig.tcpTimeout = paramValueUint;
+        data.config.tcpTimeout = paramValueUint;
         break;
       case POST_BAUD:
         {
           action = ACT_RESET_SERIAL;  // this RESET_SERIAL is triggered when the user changes anything on the "RTU Settings" page.
           // No need to trigger RESET_ETH for other cases (POST_DATA, POST_PARITY etc.)
-          localConfig.baud = paramValueUint;
+          data.config.baud = paramValueUint;
           byte minFrameDelay = byte((frameDelay() / 1000UL) + 1);
-          if (localConfig.frameDelay < minFrameDelay) {
-            localConfig.frameDelay = minFrameDelay;
+          if (data.config.frameDelay < minFrameDelay) {
+            data.config.frameDelay = minFrameDelay;
           }
         }
         break;
       case POST_DATA:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xF9) | ((byte(paramValueUint) - 5) << 1);
+          data.config.serialConfig = (data.config.serialConfig & 0xF9) | ((byte(paramValueUint) - 5) << 1);
         }
         break;
       case POST_PARITY:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xCF) | (byte(paramValueUint) << 4);
+          data.config.serialConfig = (data.config.serialConfig & 0xCF) | (byte(paramValueUint) << 4);
         }
         break;
       case POST_STOP:
         {
-          localConfig.serialConfig = (localConfig.serialConfig & 0xF7) | ((byte(paramValueUint) - 1) << 3);
+          data.config.serialConfig = (data.config.serialConfig & 0xF7) | ((byte(paramValueUint) - 1) << 3);
         }
         break;
       case POST_FRAMEDELAY:
-        localConfig.frameDelay = byte(paramValueUint);
+        data.config.frameDelay = byte(paramValueUint);
         break;
       case POST_TIMEOUT:
-        localConfig.serialTimeout = paramValueUint;
+        data.config.serialTimeout = paramValueUint;
         break;
       case POST_ATTEMPTS:
-        localConfig.serialAttempts = byte(paramValueUint);
+        data.config.serialAttempts = byte(paramValueUint);
         break;
       case POST_ACTION:
         action = action_type(paramValueUint);
@@ -341,9 +342,8 @@ void processPost(EthernetClient &client) {
     }
   }
   switch (action) {
-    case ACT_FACTORY:
-      localConfig = DEFAULT_CONFIG;
-      resetStats();
+    case ACT_DEFAULT:
+      data.config = DEFAULT_CONFIG;
       break;
     case ACT_RESET_STATS:
       resetStats();
@@ -369,7 +369,7 @@ void processPost(EthernetClient &client) {
   // if new Modbus request received, put into queue
   if (requestLen > 1 && queueHeaders.available() > 1 && queueData.available() > requestLen) {  // at least 2 bytes in request (slave address and function)
     // push to queue
-    queueHeaders.push(header{
+    queueHeaders.push(header_t{
       { 0x00, 0x00 },  // tid[2]
       requestLen,      // msgLen
       { 0, 0, 0, 0 },  // remIP[4]

@@ -47,7 +47,7 @@
 
 
 void startSerial() {
-  mySerial.begin((localConfig.baud * 100UL), localConfig.serialConfig);
+  mySerial.begin((data.config.baud * 100UL), data.config.serialConfig);
 #ifdef RS485_CONTROL_PIN
   pinMode(RS485_CONTROL_PIN, OUTPUT);
   digitalWrite(RS485_CONTROL_PIN, RS485_RECEIVE);  // Init Transceiver
@@ -58,16 +58,16 @@ void startSerial() {
 byte bitsPerChar() {
   byte bits =
     1 +                                                         // start bit
-    (((localConfig.serialConfig & 0x06) >> 1) + 5) +            // data bits
-    (((localConfig.serialConfig & 0x08) >> 3) + 1);             // stop bits
-  if (((localConfig.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
+    (((data.config.serialConfig & 0x06) >> 1) + 5) +            // data bits
+    (((data.config.serialConfig & 0x08) >> 3) + 1);             // stop bits
+  if (((data.config.serialConfig & 0x30) >> 4) > 1) bits += 1;  // parity bit (if present)
   return bits;
 }
 
 // character timeout in micros
 uint32_t charTimeOut() {
-  if (localConfig.baud <= 192) {
-    return (15000UL * bitsPerChar()) / localConfig.baud;  // inter-character time-out should be 1,5T
+  if (data.config.baud <= 192) {
+    return (15000UL * bitsPerChar()) / data.config.baud;  // inter-character time-out should be 1,5T
   } else {
     return 750;
   }
@@ -75,8 +75,8 @@ uint32_t charTimeOut() {
 
 // minimum frame delay in micros
 uint32_t frameDelay() {
-  if (localConfig.baud <= 192) {
-    return (35000UL * bitsPerChar()) / localConfig.baud;  // inter-frame delay should be 3,5T
+  if (data.config.baud <= 192) {
+    return (35000UL * bitsPerChar()) / data.config.baud;  // inter-frame delay should be 3,5T
   } else {
     return 1750;  // 1750 μs
   }
@@ -91,20 +91,20 @@ void startEthernet() {
     delay(ETH_RESET_DELAY);
   }
 #ifdef ENABLE_DHCP
-  if (localConfig.enableDhcp) {
-    dhcpSuccess = Ethernet.begin(mac);
+  if (data.config.enableDhcp) {
+    dhcpSuccess = Ethernet.begin(data.mac);
   }
-  if (!localConfig.enableDhcp || dhcpSuccess == false) {
-    Ethernet.begin(mac, localConfig.ip, localConfig.dns, localConfig.gateway, localConfig.subnet);
+  if (!data.config.enableDhcp || dhcpSuccess == false) {
+    Ethernet.begin(data.mac, data.config.ip, data.config.dns, data.config.gateway, data.config.subnet);
   }
 #else  /* ENABLE_DHCP */
-  Ethernet.begin(mac, localConfig.ip, {}, localConfig.gateway, localConfig.subnet);  // No DNS
+  Ethernet.begin(data.mac, data.config.ip, {}, data.config.gateway, data.config.subnet);  // No DNS
 #endif /* ENABLE_DHCP */
   W5100.setRetransmissionTime(TCP_RETRANSMISSION_TIMEOUT);
   W5100.setRetransmissionCount(TCP_RETRANSMISSION_COUNT);
-  modbusServer = EthernetServer(localConfig.tcpPort);
-  webServer = EthernetServer(localConfig.webPort);
-  Udp.begin(localConfig.udpPort);
+  modbusServer = EthernetServer(data.config.tcpPort);
+  webServer = EthernetServer(data.config.webPort);
+  Udp.begin(data.config.udpPort);
   modbusServer.begin();
   webServer.begin();
 #if MAX_SOCK_NUM > 4
@@ -116,7 +116,7 @@ void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
-  if (localConfig.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
+  if (data.config.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
     byte maintainResult = Ethernet.maintain();
     if (maintainResult == 1 || maintainResult == 3) {  // renew failed or rebind failed
       dhcpSuccess = false;
@@ -146,7 +146,7 @@ bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const uint32_t ROLLOVER = 0xFFFFFF00;
   for (byte i = 0; i < ERROR_LAST; i++) {
-    if (errorCount[i] > ROLLOVER) {
+    if (data.errorCnt[i] > ROLLOVER) {
       return true;
     }
   }
@@ -155,7 +155,7 @@ bool rollover() {
     return true;
   }
   for (byte i = 0; i < DATA_LAST; i++) {
-    if (rtuCount[i] > ROLLOVER || ethCount[i] > ROLLOVER) {
+    if (data.rtuCnt[i] > ROLLOVER || data.ethCnt[i] > ROLLOVER) {
       return true;
     }
   }
@@ -163,48 +163,33 @@ bool rollover() {
   return false;
 }
 
+// resets counters to 0: data.errorCnt, data.rtuCnt, data.ethCnt
 void resetStats() {
-  memset(errorCount, 0, sizeof(errorCount));
+  memset(data.errorCnt, 0, sizeof(data.errorCnt));
 #ifdef ENABLE_EXTRA_DIAG
+  memset(data.rtuCnt, 0, sizeof(data.rtuCnt));
+  memset(data.ethCnt, 0, sizeof(data.ethCnt));
   remaining_seconds = -(millis() / 1000);
-  memset(rtuCount, 0, sizeof(rtuCount));
-  memset(ethCount, 0, sizeof(ethCount));
 #endif /* ENABLE_EXTRA_DIAG */
-  updateEeprom();
 }
 
+// generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
 void generateMac() {
   // Marsaglia algorithm from https://github.com/RobTillaart/randomHelpers
   seed1 = 36969L * (seed1 & 65535L) + (seed1 >> 16);
   seed2 = 18000L * (seed2 & 65535L) + (seed2 >> 16);
   uint32_t randomBuffer = (seed1 << 16) + seed2; /* 32-bit random */
-  memcpy(mac, MAC_START, 3);                     // set first 3 bytes
+  memcpy(data.mac, MAC_START, 3);                // set first 3 bytes
   for (byte i = 0; i < 3; i++) {
-    mac[i + 3] = randomBuffer & 0xFF;  // random last 3 bytes
+    data.mac[i + 3] = randomBuffer & 0xFF;  // random last 3 bytes
     randomBuffer >>= 8;
   }
 }
 
 void updateEeprom() {
   eepromTimer.sleep(EEPROM_INTERVAL * 60UL * 60UL * 1000UL);  // EEPROM_INTERVAL is in hours, sleep is in milliseconds!
-  eepromWrites++;                                             // we assume that at least some bytes are written to EEPROM during EEPROM.update or EEPROM.put
-  uint16_t address = CONFIG_START;
-  EEPROM.put(address, eepromWrites);
-  address += sizeof(eepromWrites);
-  EEPROM.put(address, VERSION[0]);
-  address += 1;
-  EEPROM.put(address, mac);
-  address += 6;
-  EEPROM.put(address, localConfig);
-  address += sizeof(localConfig);
-  EEPROM.put(address, errorCount);
-  address += sizeof(errorCount);
-#ifdef ENABLE_EXTRA_DIAG
-  EEPROM.put(address, rtuCount);
-  address += sizeof(rtuCount);
-  EEPROM.put(address, ethCount);
-  address += sizeof(ethCount);
-#endif /* ENABLE_EXTRA_DIAG */
+  data.eepromWrites++;                                        // we assume that at least some bytes are written to EEPROM during EEPROM.update or EEPROM.put
+  EEPROM.put(DATA_START, data);
 }
 
 #if MAX_SOCK_NUM == 8
@@ -243,7 +228,7 @@ void manageSockets() {
       case SnSR::SYNRECV:
         {
           lastSocketUse[s] = millis();
-          if (W5100.readSnPORT(s) == localConfig.webPort) {
+          if (W5100.readSnPORT(s) == data.config.webPort) {
             webListening = s;
           } else {
             modbusListening = s;
@@ -275,8 +260,8 @@ void manageSockets() {
               W5100.execCmdSn(s, Sock_DISCON);  //  send DISCON command...
               lastSocketUse[s] = millis();      //   record time at which it was sent...
                                                 // status becomes LAST_ACK for short time
-            } else if (((W5100.readSnPORT(s) == localConfig.webPort && sockAge > WEB_IDLE_TIMEOUT)
-                        || (W5100.readSnPORT(s) == localConfig.tcpPort && sockAge > (localConfig.tcpTimeout * 1000UL)))
+            } else if (((W5100.readSnPORT(s) == data.config.webPort && sockAge > WEB_IDLE_TIMEOUT)
+                        || (W5100.readSnPORT(s) == data.config.tcpPort && sockAge > (data.config.tcpTimeout * 1000UL)))
                        && sockAge > maxAge) {
               oldest = s;        //     record the socket number...
               maxAge = sockAge;  //      and make its age the new max age.
@@ -291,7 +276,7 @@ void manageSockets() {
 
   if (dataAvailable != MAX_SOCK_NUM) {
     EthernetClient client = EthernetClient(dataAvailable);
-    if (W5100.readSnPORT(dataAvailable) == localConfig.webPort) {
+    if (W5100.readSnPORT(dataAvailable) == data.config.webPort) {
       recvWeb(client);
     } else {
       recvTcp(client);
