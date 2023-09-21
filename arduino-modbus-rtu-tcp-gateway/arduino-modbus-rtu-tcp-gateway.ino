@@ -22,9 +22,10 @@
   v6.1 2023-04-12 Code optimization
   v7.0 2023-07-21 Manual MAC, better data types
   v7.1 2023-08-25 Simplify EEPROM read and write, Tools page
+  v7.2 2023-XX-XX Disable DHCP renewal fallback, recover after short power loss
 */
 
-const byte VERSION[] = { 7, 1 };
+const byte VERSION[] = { 7, 2 };
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -167,7 +168,8 @@ void Timer::sleep(uint32_t sleepTimeMs) {
 
 MicroTimer recvMicroTimer;
 MicroTimer sendMicroTimer;
-Timer eepromTimer;  // timer to delay writing statistics to EEPROM
+Timer eepromTimer;    // timer to delay writing statistics to EEPROM
+Timer checkEthTimer;  // timer to check SPI connection with ethernet shield
 
 #define RS485_TRANSMIT HIGH
 #define RS485_RECEIVE LOW
@@ -240,6 +242,10 @@ void loop() {
 
   if (EEPROM_INTERVAL > 0 && eepromTimer.isOver() == true) {
     updateEeprom();
+  }
+
+  if (CHECK_ETH_INTERVAL > 0 && checkEthTimer.isOver() == true) {
+    checkEthernet();
   }
 
   if (rollover()) {

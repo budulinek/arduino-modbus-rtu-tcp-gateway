@@ -114,14 +114,24 @@ void startEthernet() {
 
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
+void checkEthernet() {
+  static byte attempts = 0;
+  IPAddress tempIP = Ethernet.localIP();
+  if (tempIP[0] == 0) {
+    attempts++;
+    if (attempts >= 3) {
+      resetFunc();
+    }
+  } else {
+    attempts = 0;
+  }
+  checkEthTimer.sleep(CHECK_ETH_INTERVAL);
+}
+
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
   if (data.config.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
-    byte maintainResult = Ethernet.maintain();
-    if (maintainResult == 1 || maintainResult == 3) {  // renew failed or rebind failed
-      dhcpSuccess = false;
-      startEthernet();  // another DHCP request, fallback to static IP
-    }
+    Ethernet.maintain();
   }
 }
 #endif /* ENABLE_DHCP */
@@ -208,7 +218,7 @@ void manageSockets() {
   byte webListening = MAX_SOCK_NUM;
   byte dataAvailable = MAX_SOCK_NUM;
   byte socketsAvailable = 0;
-  // SPI.beginTransaction(SPI_ETHERNET_SETTINGS);								// begin SPI transaction
+  SPI.beginTransaction(SPI_ETHERNET_SETTINGS);  // begin SPI transaction
   // look at all the hardware sockets, record and take action based on current states
   for (byte s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
     byte status = W5100.readSnSR(s);                 //  get socket status...
@@ -294,8 +304,8 @@ void manageSockets() {
     disconSocket(oldest);
   }
 
-  // SPI.endTransaction();	// Serves to o release the bus for other devices to access it. Since the ethernet chip is the only device
-  // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction()
+  SPI.endTransaction();  // Serves to o release the bus for other devices to access it. Since the ethernet chip is the only device
+  // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction() ??
 }
 
 void disconSocket(byte s) {
