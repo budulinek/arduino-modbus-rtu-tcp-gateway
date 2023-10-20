@@ -70,7 +70,7 @@ void sendSerial() {
       break;
     case 2:  // DELAY:
       {
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
         data.rtuCnt[DATA_TX] += myHeader.msgLen;
         data.rtuCnt[DATA_TX] += 2;
 #endif
@@ -157,9 +157,9 @@ void recvSerial() {
     } else {
       data.errorCnt[ERROR_RTU]++;
     }
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
     data.rtuCnt[DATA_RX] += rxNdx;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
     rxNdx = 0;
   }
 }
@@ -181,10 +181,10 @@ void sendResponse(const byte MBAP[], const byte PDU[], const uint16_t pduLength)
       Udp.write(PDU, pduLength - 2);  //send without CRC
     }
     Udp.endPacket();
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
     data.ethCnt[DATA_TX] += pduLength;
     if (!data.config.enableRtuOverTcp) data.ethCnt[DATA_TX] += 4;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
   } else if (myHeader.requestType & TCP_REQUEST) {
     byte sock = myHeader.requestType & TCP_REQUEST_MASK;
     EthernetClient client = EthernetClient(sock);
@@ -194,10 +194,10 @@ void sendResponse(const byte MBAP[], const byte PDU[], const uint16_t pduLength)
         client.write(MBAP, 6);
         client.write(PDU, pduLength - 2);  //send without CRC
       }
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
       data.ethCnt[DATA_TX] += pduLength;
       if (!data.config.enableRtuOverTcp) data.ethCnt[DATA_TX] += 4;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
     }  // TODO TCP Connection Error
   }    // else SCAN_REQUEST (no data.ethCnt[DATA_TX], but yes delete request)
   deleteRequest();

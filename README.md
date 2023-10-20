@@ -224,8 +224,8 @@ In the next step, add individual Modbus devices. Adding and configuring Modbus d
 * download **Device Template** from the **[Loxone Library](https://library.loxone.com/)** (there are already hundreds of templates for various Modbus devices)
 * manually add your device following this **[official tutorial](https://www.loxone.com/enen/kb/communication-with-modbus/)**.
 
-Please note that the implementation of Modbus RTU (= Loxone Modbus Extension) and Modbus TCP (= Arduino Modbus gateway connected as "Modbus Server") in Loxone is flawed:
-* Miniserver can not poll your Modbus sensors faster than 5 seconds. This is a deliberate restriction imposed by Loxone.
+Please note that the implementation of Modbus RTU (= Loxone Modbus Extension) and Modbus TCP (= Arduino Modbus gateway connected as "Modbus Server") in Loxone has some restrictions:
+* ~~Miniserver can not poll your Modbus sensors faster than 5 seconds. This is a deliberate restriction imposed by Loxone.~~ **Fixed in Loxone Config 14.4.9.25**. Minimum polling-cycle reduced to 1s (except Air-Devices), up to 2 Sensors per Modbus-Server or Extension allow a minimum time of 0.1s.
 * Miniserver can not poll multiple Modbus registers at once. If you have multiple sensors on the device, Loxone will send a separate requests for each of them even if you have identical poll intervals for these sensors. This is a design flaw by Loxone.
 
 **Modbus UDP**. If you want to avoid the above mentioned limitations, you can use Modbus UDP as a communication protocol between Loxone and this Arduino Modbus gateway. See [Loxone_ModbusUDP.md](Loxone_ModbusUDP.md) on how to implement Modbus UDP in Loxone with **Virtual UDP output** and **Virtual UDP input**.

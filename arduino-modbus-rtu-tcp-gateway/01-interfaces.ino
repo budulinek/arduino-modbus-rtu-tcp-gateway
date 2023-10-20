@@ -114,19 +114,29 @@ void startEthernet() {
 
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
+void checkEthernet() {
+  static byte attempts = 0;
+  IPAddress tempIP = Ethernet.localIP();
+  if (tempIP[0] == 0) {
+    attempts++;
+    if (attempts >= 3) {
+      resetFunc();
+    }
+  } else {
+    attempts = 0;
+  }
+  checkEthTimer.sleep(CHECK_ETH_INTERVAL);
+}
+
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
   if (data.config.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
-    byte maintainResult = Ethernet.maintain();
-    if (maintainResult == 1 || maintainResult == 3) {  // renew failed or rebind failed
-      dhcpSuccess = false;
-      startEthernet();  // another DHCP request, fallback to static IP
-    }
+    Ethernet.maintain();
   }
 }
 #endif /* ENABLE_DHCP */
 
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
 void maintainUptime() {
   uint32_t milliseconds = millis();
   if (last_milliseconds > milliseconds) {
@@ -140,7 +150,7 @@ void maintainUptime() {
   //We add the "remaining_seconds", so that we can continue measuring the time passed from the last boot of the device.
   seconds = (milliseconds / 1000) + remaining_seconds;
 }
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
 
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
@@ -150,7 +160,7 @@ bool rollover() {
       return true;
     }
   }
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   if (seconds > ROLLOVER) {
     return true;
   }
@@ -159,18 +169,18 @@ bool rollover() {
       return true;
     }
   }
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
   return false;
 }
 
 // resets counters to 0: data.errorCnt, data.rtuCnt, data.ethCnt
 void resetStats() {
   memset(data.errorCnt, 0, sizeof(data.errorCnt));
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   memset(data.rtuCnt, 0, sizeof(data.rtuCnt));
   memset(data.ethCnt, 0, sizeof(data.ethCnt));
   remaining_seconds = -(millis() / 1000);
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
 }
 
 // generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
@@ -208,7 +218,7 @@ void manageSockets() {
   byte webListening = MAX_SOCK_NUM;
   byte dataAvailable = MAX_SOCK_NUM;
   byte socketsAvailable = 0;
-  // SPI.beginTransaction(SPI_ETHERNET_SETTINGS);								// begin SPI transaction
+  SPI.beginTransaction(SPI_ETHERNET_SETTINGS);  // begin SPI transaction
   // look at all the hardware sockets, record and take action based on current states
   for (byte s = 0; s < maxSockNum; s++) {            // for each hardware socket ...
     byte status = W5100.readSnSR(s);                 //  get socket status...
@@ -294,8 +304,8 @@ void manageSockets() {
     disconSocket(oldest);
   }
 
-  // SPI.endTransaction();	// Serves to o release the bus for other devices to access it. Since the ethernet chip is the only device
-  // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction()
+  SPI.endTransaction();  // Serves to o release the bus for other devices to access it. Since the ethernet chip is the only device
+  // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction() ??
 }
 
 void disconSocket(byte s) {

@@ -42,9 +42,9 @@ uint16_t crc;
 void recvUdp() {
   uint16_t msgLength = Udp.parsePacket();
   if (msgLength) {
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
     data.ethCnt[DATA_RX] += msgLength;
-#endif                               /* ENABLE_EXTRA_DIAG */
+#endif                               /* ENABLE_EXTENDED_WEBUI */
     byte inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
                                      // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address)..... no CRC
                                      // Modbus RTU frame: [0] address.....[n-1][n] CRC
@@ -72,19 +72,19 @@ void recvUdp() {
         Udp.write(highByte(crc));
       }
       Udp.endPacket();
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
       data.ethCnt[DATA_TX] += 5;
       if (!data.config.enableRtuOverTcp) data.ethCnt[DATA_TX] += 4;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
     }
   }
 }
 
 void recvTcp(EthernetClient &client) {
   uint16_t msgLength = client.available();
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   data.ethCnt[DATA_RX] += msgLength;
-#endif                             /* ENABLE_EXTRA_DIAG */
+#endif                             /* ENABLE_EXTENDED_WEBUI */
   byte inBuffer[MODBUS_SIZE + 4];  // Modbus TCP frame is 4 bytes longer than Modbus RTU frame
                                    // Modbus TCP/UDP frame: [0][1] transaction ID, [2][3] protocol ID, [4][5] length and [6] unit ID (address).....
                                    // Modbus RTU frame: [0] address.....
@@ -114,10 +114,10 @@ void recvTcp(EthernetClient &client) {
       outBuffer[i++] = highByte(crc);
     }
     client.write(outBuffer, i);
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
     data.ethCnt[DATA_TX] += 5;
     if (!data.config.enableRtuOverTcp) data.ethCnt[DATA_TX] += 4;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
   }
 }
 
