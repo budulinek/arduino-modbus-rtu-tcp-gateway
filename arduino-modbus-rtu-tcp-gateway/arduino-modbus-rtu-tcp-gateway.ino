@@ -23,6 +23,7 @@
   v7.0 2023-07-21 Manual MAC, better data types
   v7.1 2023-08-25 Simplify EEPROM read and write, Tools page
   v7.2 2023-10-20 Disable DHCP renewal fallback, better advanced_settings.h layout
+                  ENABLE_EXTENDED_WEBUI is set by default for Uno and Mega, ENABLE_DHCP is set by default for Mega
 */
 
 const byte VERSION[] = { 7, 2 };
