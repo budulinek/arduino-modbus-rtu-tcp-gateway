@@ -136,7 +136,7 @@ void maintainDhcp() {
 }
 #endif /* ENABLE_DHCP */
 
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
 void maintainUptime() {
   uint32_t milliseconds = millis();
   if (last_milliseconds > milliseconds) {
@@ -150,7 +150,7 @@ void maintainUptime() {
   //We add the "remaining_seconds", so that we can continue measuring the time passed from the last boot of the device.
   seconds = (milliseconds / 1000) + remaining_seconds;
 }
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
 
 bool rollover() {
   // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
@@ -160,7 +160,7 @@ bool rollover() {
       return true;
     }
   }
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   if (seconds > ROLLOVER) {
     return true;
   }
@@ -169,18 +169,18 @@ bool rollover() {
       return true;
     }
   }
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
   return false;
 }
 
 // resets counters to 0: data.errorCnt, data.rtuCnt, data.ethCnt
 void resetStats() {
   memset(data.errorCnt, 0, sizeof(data.errorCnt));
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   memset(data.rtuCnt, 0, sizeof(data.rtuCnt));
   memset(data.ethCnt, 0, sizeof(data.ethCnt));
   remaining_seconds = -(millis() / 1000);
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
 }
 
 // generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)

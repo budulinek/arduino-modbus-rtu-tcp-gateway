@@ -260,7 +260,7 @@ void contentInfo(ChunkedPrint &chunked) {
 //        Modbus Status
 void contentStatus(ChunkedPrint &chunked) {
 
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
   tagLabelDiv(chunked, F("Run Time"));
   tagSpan(chunked, JSON_TIME);
   tagDivClose(chunked);
@@ -270,7 +270,7 @@ void contentStatus(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Ethernet Data"));
   tagSpan(chunked, JSON_ETH_DATA);
   tagDivClose(chunked);
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
 
   tagLabelDiv(chunked, F("Modbus RTU Request"));
   for (byte i = 0; i <= POST_REQ_LAST - POST_REQ; i++) {
@@ -650,7 +650,7 @@ void stringStats(ChunkedPrint &chunked, const byte stat) {
 
 void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
   switch (JSONKEY) {
-#ifdef ENABLE_EXTRA_DIAG
+#ifdef ENABLE_EXTENDED_WEBUI
     case JSON_TIME:
       chunked.print(seconds / (3600UL * 24L));
       chunked.print(F(" days, "));
@@ -686,7 +686,7 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
         }
       }
       break;
-#endif /* ENABLE_EXTRA_DIAG */
+#endif /* ENABLE_EXTENDED_WEBUI */
     case JSON_RESPONSE:
       {
         for (byte i = 0; i < MAX_RESPONSE_LEN; i++) {
