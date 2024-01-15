@@ -1,46 +1,19 @@
-/* *******************************************************************
-   Pages for Webserver
-
-   sendPage()
-   - sends the requested page (incl. 404 error and JSON document)
-   - displays main page, renders title and left menu using <div> 
-   - calls content functions depending on the number (i.e. URL) of the requested web page
-   - also displays buttons for some of the pages
-   - in order to save flash memory, some HTML closing tags are omitted, new lines in HTML code are also omitted
-
-   contentInfo(), contentStatus(), contentIp(), contentTcp(), contentRtu(), contentTools()
-   - render the content of the requested page
-
-   contentWait()
-   - renders the "please wait" message instead of the content, will be forwarded to home page after 5 seconds
-
-   tagInputNumber(), tagLabelDiv(), tagButton(), tagDivClose(), tagSpan()
-   - render snippets of repetitive HTML code for <input>, <label>, <div>, <button> and <span> tags
-
-   stringPageName(), stringStats()
-   - renders repetitive strings for menus, error counters
-
-   jsonVal()
-   - provide JSON value to a corresponding JSON key
-
-   ***************************************************************** */
-
 const byte WEB_OUT_BUFFER_SIZE = 64;  // size of web server write buffer (used by StreamLib)
 
+/**************************************************************************/
+/*!
+  @brief Sends the requested page (incl. 404 error and JSON document),
+  displays main page, renders title and left menu using, calls content functions
+  depending on the number (i.e. URL) of the requested web page.
+  In order to save flash memory, some HTML closing tags are omitted,
+  new lines in HTML code are also omitted.
+  @param client Ethernet TCP client
+  @param reqPage Requested page number
+*/
+/**************************************************************************/
 void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[WEB_OUT_BUFFER_SIZE];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
-  /*
-
-use HTTP/1.0 because 
-- HOSTS: isn't necessary as the Arduino will only host one server.
-- in HTTP/1.1 HOSTS: is mandatory (and necessary if you HOST more than one site on one server) and the server should answer a request with "400 Bad Request" if it is missing
-- we don't need to send a Content-Length in HTTP/1.0
-
-An advantage of HTTP 1.1 is
-- you could keep the connection alive
- 
- */
   if (reqPage == PAGE_ERROR) {
     chunked.print(F("HTTP/1.1 404 Not Found\r\n"
                     "\r\n"
@@ -48,7 +21,7 @@ An advantage of HTTP 1.1 is
     chunked.end();
     return;
   } else if (reqPage == PAGE_DATA) {
-    chunked.print(F("HTTP/1.1 200\r\n"
+    chunked.print(F("HTTP/1.1 200\r\n"  // An advantage of HTTP 1.1 is that you can keep the connection alive
                     "Content-Type: application/json\r\n"
                     "Transfer-Encoding: chunked\r\n"
                     "\r\n"));
@@ -164,7 +137,6 @@ An advantage of HTTP 1.1 is
                   "<form method=post>"));
 
   //   PLACE FUNCTIONS PROVIDING CONTENT HERE
-
   switch (reqPage) {
     case PAGE_INFO:
       contentInfo(chunked);
@@ -200,7 +172,13 @@ An advantage of HTTP 1.1 is
 }
 
 
-//        System Info
+/**************************************************************************/
+/*!
+  @brief System Info
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentInfo(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("SW Version"));
   chunked.print(VERSION[0]);
@@ -257,7 +235,13 @@ void contentInfo(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 }
 
-//        Modbus Status
+/**************************************************************************/
+/*!
+  @brief P1P2 Status
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentStatus(ChunkedPrint &chunked) {
 
 #ifdef ENABLE_EXTENDED_WEBUI
@@ -311,7 +295,13 @@ void contentStatus(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 }
 
-//            IP Settings
+/**************************************************************************/
+/*!
+  @brief IP Settings
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentIp(ChunkedPrint &chunked) {
 
   tagLabelDiv(chunked, F("MAC Address"));
@@ -363,7 +353,13 @@ void contentIp(ChunkedPrint &chunked) {
 #endif /* ENABLE_DHCP */
 }
 
-//            TCP/UDP Settings
+/**************************************************************************/
+/*!
+  @brief TCP/UDP Settings
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentTcp(ChunkedPrint &chunked) {
   uint16_t value;
   for (byte i = 0; i < 3; i++) {
@@ -414,7 +410,13 @@ void contentTcp(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 }
 
-//            RTU Settings
+/**************************************************************************/
+/*!
+  @brief RTU Settings
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentRtu(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Baud Rate"));
   chunked.print(F("<select class=s name="));
@@ -496,7 +498,13 @@ void contentRtu(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 }
 
-//            Tools
+/**************************************************************************/
+/*!
+  @brief Tools
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void contentTools(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, 0);
   tagButton(chunked, F("Load Default Settings"), ACT_DEFAULT);
@@ -516,8 +524,18 @@ void contentWait(ChunkedPrint &chunked) {
   tagDivClose(chunked);
 }
 
-// Functions providing snippets of repetitive HTML code
+/**************************************************************************/
+/*!
+  @brief <input type=number>
 
+  @param chunked Chunked buffer
+  @param name Name POST_
+  @param min Minimum value
+  @param max Maximum value
+  @param value Current value
+  @param units Units (string)
+*/
+/**************************************************************************/
 void tagInputNumber(ChunkedPrint &chunked, const byte name, const byte min, uint16_t max, uint16_t value, const __FlashStringHelper *units) {
   chunked.print(F("<input class='s n' required type=number name="));
   chunked.print(name, HEX);
@@ -535,7 +553,17 @@ void tagInputNumber(ChunkedPrint &chunked, const byte name, const byte min, uint
   chunked.print(units);
 }
 
-void tagInputIp(ChunkedPrint &chunked, const byte name, const byte ip[]) {
+/**************************************************************************/
+/*!
+  @brief <input>
+  IP address (4 elements)
+
+  @param chunked Chunked buffer
+  @param name Name POST_
+  @param ip IP address from data.config
+*/
+/**************************************************************************/
+void tagInputIp(ChunkedPrint &chunked, const byte name, byte ip[]) {
   for (byte i = 0; i < 4; i++) {
     chunked.print(F("<input name="));
     chunked.print(name + i, HEX);
@@ -546,6 +574,18 @@ void tagInputIp(ChunkedPrint &chunked, const byte name, const byte ip[]) {
   }
 }
 
+/**************************************************************************/
+/*!
+  @brief <input>
+  HEX string (2 chars)
+
+  @param chunked Chunked buffer
+  @param name Name POST_
+  @param required True if input is required
+  @param printVal True if value is shown
+  @param value Value
+*/
+/**************************************************************************/
 void tagInputHex(ChunkedPrint &chunked, const byte name, const bool required, const bool printVal, const byte value) {
   chunked.print(F("<input name="));
   chunked.print(name, HEX);
@@ -559,6 +599,14 @@ void tagInputHex(ChunkedPrint &chunked, const byte name, const bool required, co
   chunked.print(F("'>"));
 }
 
+/**************************************************************************/
+/*!
+  @brief <label><div>
+
+  @param chunked Chunked buffer
+  @param label Label string
+*/
+/**************************************************************************/
 void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
   chunked.print(F("<div class=r>"));
   chunked.print(F("<label> "));
@@ -569,6 +617,15 @@ void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
   chunked.print(F("</label><div>"));
 }
 
+/**************************************************************************/
+/*!
+  @brief <button>
+
+  @param chunked Chunked buffer
+  @param flashString Button string
+  @param value Value to be sent via POST
+*/
+/**************************************************************************/
 void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, byte value) {
   chunked.print(F(" <button name="));
   chunked.print(POST_ACTION, HEX);
@@ -579,11 +636,26 @@ void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, by
   chunked.print(F("</button>"));
 }
 
+/**************************************************************************/
+/*!
+  @brief </div>
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
 void tagDivClose(ChunkedPrint &chunked) {
   chunked.print(F("</div>"
                   "</div>"));  // <div class=r>
 }
 
+/**************************************************************************/
+/*!
+  @brief <span>
+
+  @param chunked Chunked buffer
+  @param JSONKEY JSON_ id
+*/
+/**************************************************************************/
 void tagSpan(ChunkedPrint &chunked, const byte JSONKEY) {
   chunked.print(F("<span id="));
   chunked.print(JSONKEY);
@@ -592,7 +664,14 @@ void tagSpan(ChunkedPrint &chunked, const byte JSONKEY) {
   chunked.print(F("</span>"));
 }
 
-// Menu item strings
+/**************************************************************************/
+/*!
+  @brief Menu item strings
+
+  @param chunked Chunked buffer
+  @param item Page number
+*/
+/**************************************************************************/
 void stringPageName(ChunkedPrint &chunked, byte item) {
   switch (item) {
     case PAGE_INFO:
@@ -648,6 +727,14 @@ void stringStats(ChunkedPrint &chunked, const byte stat) {
   chunked.print(F("<br>"));
 }
 
+/**************************************************************************/
+/*!
+  @brief Provide JSON value to a corresponding JSON key. The value is printed
+  in <span> and in JSON document fetched on the background.
+  @param chunked Chunked buffer
+  @param JSONKEY JSON key
+*/
+/**************************************************************************/
 void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
   switch (JSONKEY) {
 #ifdef ENABLE_EXTENDED_WEBUI

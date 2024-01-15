@@ -24,9 +24,10 @@
   v7.1 2023-08-25 Simplify EEPROM read and write, Tools page
   v7.2 2023-10-20 Disable DHCP renewal fallback, better advanced_settings.h layout
                   ENABLE_EXTENDED_WEBUI and ENABLE_DHCP is set by default for Mega
+  v7.3 2024-01-16 Bugfix Modbus RTU Request form, code comments
 */
 
-const byte VERSION[] = { 7, 2 };
+const byte VERSION[] = { 7, 3 };
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -129,11 +130,6 @@ CircularBuffer<byte, MAX_QUEUE_DATA> queueData;             // queue of PDU data
 
 
 /****** ETHERNET AND SERIAL ******/
-
-#ifdef UDP_TX_PACKET_MAX_SIZE
-#undef UDP_TX_PACKET_MAX_SIZE
-#define UDP_TX_PACKET_MAX_SIZE MODBUS_SIZE
-#endif
 
 byte maxSockNum = MAX_SOCK_NUM;
 

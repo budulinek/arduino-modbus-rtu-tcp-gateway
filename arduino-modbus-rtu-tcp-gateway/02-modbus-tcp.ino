@@ -39,6 +39,11 @@ byte masks[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 uint16_t crc;
 
+/**************************************************************************/
+/*!
+  @brief Receives Modbus UDP (or Modbus RTU over UDP) messages, calls @ref checkRequest()
+*/
+/**************************************************************************/
 void recvUdp() {
   uint16_t msgLength = Udp.parsePacket();
   if (msgLength) {
@@ -80,6 +85,11 @@ void recvUdp() {
   }
 }
 
+/**************************************************************************/
+/*!
+  @brief Receives Modbus TCP (or Modbus RTU over TCP) messages, calls @ref checkRequest()
+*/
+/**************************************************************************/
 void recvTcp(EthernetClient &client) {
   uint16_t msgLength = client.available();
 #ifdef ENABLE_EXTENDED_WEBUI
@@ -150,6 +160,19 @@ void scanRequest() {
   }
 }
 
+/**************************************************************************/
+/*!
+  @brief Checks Modbus TCP/UDP requests (correct MBAP header,
+  CRC in case of Modbus RTU over TCP/UDP), checks availability of queue,
+  stores requests into queue or returns an error.
+  @param inBuffer Modbus TCP/UDP requests
+  @param msgLength Length of the Modbus TCP/UDP requests
+  @param remoteIP Remote IP
+  @param remotePort Remote port
+  @param requestType UDP or TCP, priority or scan request
+  @return Modbus error code to be sent back to the recipient.
+*/
+/**************************************************************************/
 byte checkRequest(byte inBuffer[], uint16_t msgLength, const uint32_t remoteIP, const uint16_t remotePort, byte requestType) {
   byte addressPos = 6 * !data.config.enableRtuOverTcp;  // position of slave address in the incoming TCP/UDP message (0 for Modbus RTU over TCP/UDP and 6 for Modbus RTU over TCP/UDP)
   if (data.config.enableRtuOverTcp) {                   // check CRC for Modbus RTU over TCP/UDP
@@ -167,12 +190,12 @@ byte checkRequest(byte inBuffer[], uint16_t msgLength, const uint32_t remoteIP, 
   // check if we have space in request queue
   if (queueHeaders.available() < 1 || queueData.available() < msgLength) {
     setSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0A, true, false);
-    return 0x0A;  // return modbus error 0x0A (Gateway Overloaded)
+    return 0x0A;  // return Modbus error code 10 (Gateway Overloaded)
   }
   // allow only one request to non responding slaves
   if (getSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B_QUEUE)) {
     data.errorCnt[SLAVE_ERROR_0B]++;
-    return 0x0B;  // return modbus error 11 (Gateway Target Device Failed to Respond)
+    return 0x0B;  // return Modbus error code 11 (Gateway Target Device Failed to Respond)
   } else if (getSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B)) {
     setSlaveStatus(inBuffer[addressPos], SLAVE_ERROR_0B_QUEUE, true, false);
   } else {

@@ -1,51 +1,8 @@
-/* *******************************************************************
-   Ethernet and serial interface functions
-
-   startSerial()
-   - starts HW serial interface which we use for RS485 line
-
-   charTime(), charTimeOut(), frameDelay()
-   - calculate Modbus RTU character timeout and inter-frame delay
-
-   startEthernet()
-   - initiates ethernet interface
-   - if enabled, gets IP from DHCP
-   - starts all servers (Modbus TCP, UDP, web server)
-
-   resetFunc()
-   - well... resets Arduino
-
-   maintainDhcp()
-   - maintain DHCP lease
-
-   maintainUptime()
-   - maintains up time in case of millis() overflow
-
-   maintainCounters(), rollover()
-   - synchronizes roll-over of data counters to zero
-
-   resetStats()
-   - resets Modbus stats
-
-   generateMac()
-   - generate random MAC using pseudo random generator (faster and than build-in random())
-
-   manageSockets()
-   - closes sockets which are waiting to be closed or which refuse to close
-   - forwards sockets with data available (webserver or Modbus TCP) for further processing
-   - disconnects (closes) sockets which are too old / idle for too long
-   - opens new sockets if needed (and if available)
-
-   CreateTrulyRandomSeed()
-   - seed pseudorandom generator using  watch dog timer interrupt (works only on AVR)
-   - see https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
-
-
-   + preprocessor code for identifying microcontroller board
-
-   ***************************************************************** */
-
-
+/**************************************************************************/
+/*!
+  @brief Initiates HW serial interface which we use for the RS485 line.
+*/
+/**************************************************************************/
 void startSerial() {
   mySerial.begin((data.config.baud * 100UL), data.config.serialConfig);
 #ifdef RS485_CONTROL_PIN
@@ -54,7 +11,7 @@ void startSerial() {
 #endif                                             /* RS485_CONTROL_PIN */
 }
 
-// number of bits per character (11 in default Modbus RTU settings)
+// Number of bits per character (11 in default Modbus RTU settings)
 byte bitsPerChar() {
   byte bits =
     1 +                                                         // start bit
@@ -64,7 +21,7 @@ byte bitsPerChar() {
   return bits;
 }
 
-// character timeout in micros
+// Character timeout in micros
 uint32_t charTimeOut() {
   if (data.config.baud <= 192) {
     return (15000UL * bitsPerChar()) / data.config.baud;  // inter-character time-out should be 1,5T
@@ -73,7 +30,7 @@ uint32_t charTimeOut() {
   }
 }
 
-// minimum frame delay in micros
+// Minimum frame delay in micros
 uint32_t frameDelay() {
   if (data.config.baud <= 192) {
     return (35000UL * bitsPerChar()) / data.config.baud;  // inter-frame delay should be 3,5T
@@ -82,6 +39,12 @@ uint32_t frameDelay() {
   }
 }
 
+/**************************************************************************/
+/*!
+  @brief Initiates ethernet interface, if DHCP enabled, gets IP from DHCP,
+  starts all servers (UDP, web server).
+*/
+/**************************************************************************/
 void startEthernet() {
   if (ETH_RESET_PIN != 0) {
     pinMode(ETH_RESET_PIN, OUTPUT);
@@ -112,8 +75,18 @@ void startEthernet() {
 #endif
 }
 
+/**************************************************************************/
+/*!
+  @brief Resets Arduino (works only on AVR chips).
+*/
+/**************************************************************************/
 void (*resetFunc)(void) = 0;  //declare reset function at address 0
 
+/**************************************************************************/
+/*!
+  @brief Checks SPI connection to the W5X00 chip.
+*/
+/**************************************************************************/
 void checkEthernet() {
   static byte attempts = 0;
   IPAddress tempIP = Ethernet.localIP();
@@ -128,6 +101,11 @@ void checkEthernet() {
   checkEthTimer.sleep(CHECK_ETH_INTERVAL);
 }
 
+/**************************************************************************/
+/*!
+  @brief Maintains DHCP lease.
+*/
+/**************************************************************************/
 #ifdef ENABLE_DHCP
 void maintainDhcp() {
   if (data.config.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
@@ -136,6 +114,11 @@ void maintainDhcp() {
 }
 #endif /* ENABLE_DHCP */
 
+/**************************************************************************/
+/*!
+  @brief Maintains uptime in case of millis() overflow.
+*/
+/**************************************************************************/
 #ifdef ENABLE_EXTENDED_WEBUI
 void maintainUptime() {
   uint32_t milliseconds = millis();
@@ -152,8 +135,12 @@ void maintainUptime() {
 }
 #endif /* ENABLE_EXTENDED_WEBUI */
 
+/**************************************************************************/
+/*!
+  @brief Synchronizes roll-over of data counters to zero.
+*/
+/**************************************************************************/
 bool rollover() {
-  // synchronize roll-over of run time, data counters and modbus stats to zero, at 0xFFFFFF00
   const uint32_t ROLLOVER = 0xFFFFFF00;
   for (byte i = 0; i < ERROR_LAST; i++) {
     if (data.errorCnt[i] > ROLLOVER) {
@@ -173,7 +160,11 @@ bool rollover() {
   return false;
 }
 
-// resets counters to 0: data.errorCnt, data.rtuCnt, data.ethCnt
+/**************************************************************************/
+/*!
+  @brief Resets error stats, RTU counter and ethernet data counter.
+*/
+/**************************************************************************/
 void resetStats() {
   memset(data.errorCnt, 0, sizeof(data.errorCnt));
 #ifdef ENABLE_EXTENDED_WEBUI
@@ -183,7 +174,12 @@ void resetStats() {
 #endif /* ENABLE_EXTENDED_WEBUI */
 }
 
-// generate new MAC (bytes 0, 1 and 2 are static, bytes 3, 4 and 5 are generated randomly)
+/**************************************************************************/
+/*!
+  @brief Generate random MAC using pseudo random generator,
+  bytes 0, 1 and 2 are static (MAC_START), bytes 3, 4 and 5 are generated randomly
+*/
+/**************************************************************************/
 void generateMac() {
   // Marsaglia algorithm from https://github.com/RobTillaart/randomHelpers
   seed1 = 36969L * (seed1 & 65535L) + (seed1 >> 16);
@@ -196,21 +192,29 @@ void generateMac() {
   }
 }
 
+/**************************************************************************/
+/*!
+  @brief Write (update) data to Arduino EEPROM.
+*/
+/**************************************************************************/
 void updateEeprom() {
   eepromTimer.sleep(EEPROM_INTERVAL * 60UL * 60UL * 1000UL);  // EEPROM_INTERVAL is in hours, sleep is in milliseconds!
   data.eepromWrites++;                                        // we assume that at least some bytes are written to EEPROM during EEPROM.update or EEPROM.put
   EEPROM.put(DATA_START, data);
 }
 
-#if MAX_SOCK_NUM == 8
-uint32_t lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-#elif MAX_SOCK_NUM == 4
-uint32_t lastSocketUse[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
-byte socketInQueue[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
-#endif
 
-// from https://github.com/SapientHetero/Ethernet/blob/master/src/socket.cpp
+uint32_t lastSocketUse[MAX_SOCK_NUM];
+byte socketInQueue[MAX_SOCK_NUM];
+/**************************************************************************/
+/*!
+  @brief Closes sockets which are waiting to be closed or which refuse to close,
+  forwards sockets with data available for further processing by the webserver,
+  disconnects (closes) sockets which are too old (idle for too long), opens
+  new sockets if needed (and if available).
+  From https://github.com/SapientHetero/Ethernet/blob/master/src/socket.cpp
+*/
+/**************************************************************************/
 void manageSockets() {
   uint32_t maxAge = 0;         // the 'age' of the socket in a 'disconnectable' state that was last used the longest time ago
   byte oldest = MAX_SOCK_NUM;  // the socket number of the 'oldest' disconnectable socket
@@ -308,6 +312,12 @@ void manageSockets() {
   // we do not need SPI.beginTransaction(SPI_ETHERNET_SETTINGS) or SPI.endTransaction() ??
 }
 
+/**************************************************************************/
+/*!
+  @brief Disconnect or close a socket.
+  @param s Socket number.
+*/
+/**************************************************************************/
 void disconSocket(byte s) {
   if (W5100.readSnSR(s) == SnSR::ESTABLISHED) {
     W5100.execCmdSn(s, Sock_DISCON);  // Sock_DISCON does not close LISTEN sockets
@@ -317,7 +327,13 @@ void disconSocket(byte s) {
   }
 }
 
-// https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+
+/**************************************************************************/
+/*!
+  @brief Seed pseudorandom generator using  watch dog timer interrupt (works only on AVR).
+  See https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed
+*/
+/**************************************************************************/
 void CreateTrulyRandomSeed() {
   seed1 = 0;
   nrot = 32;  // Must be at least 4, but more increased the uniformity of the produced seeds entropy.
@@ -344,11 +360,9 @@ ISR(WDT_vect) {
   seed1 = seed1 ^ TCNT1L;
 }
 
-// Board definitions
+// Preprocessor code for identifying microcontroller board
 #if defined(TEENSYDUINO)
-
 //  --------------- Teensy -----------------
-
 #if defined(__AVR_ATmega32U4__)
 #define BOARD F("Teensy 2.0")
 #elif defined(__AVR_AT90USB1286__)
@@ -366,9 +380,7 @@ ISR(WDT_vect) {
 #else
 #define BOARD F("Unknown Board")
 #endif
-
 #else  // --------------- Arduino ------------------
-
 #if defined(ARDUINO_AVR_ADK)
 #define BOARD F("Arduino Mega Adk")
 #elif defined(ARDUINO_AVR_BT)  // Bluetooth
@@ -422,5 +434,4 @@ ISR(WDT_vect) {
 #else
 #define BOARD F("Unknown Board")
 #endif
-
 #endif

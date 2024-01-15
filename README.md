@@ -66,7 +66,7 @@ Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC 
   - all web interface inputs have proper validation
   - factory defaults for user settings can be specified in advanced_settings.h
   - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
-  - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
+  - settings marked \*\* are only available if ENABLE_EXTENDED_WEBUI is defined in the sketch
 * advanced settings:
   - can be changed in sketch (advanced_settings.h)
   - stored in flash memory
@@ -98,7 +98,7 @@ Connect your Arduino to ethernet and use your web browser to access the web inte
 Enjoy :-)
 # Settings
   - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
-  - settings marked \*\* are only available if ENABLE_EXTRA_DIAG is defined in the sketch
+  - settings marked \*\* are only available if ENABLE_EXTENDED_WEBUI is defined in the sketch
 
 ## System Info
 <img src="pics/modbus1.png" alt="modbus1" style="zoom:100%;" />
@@ -260,7 +260,7 @@ The number of used sockets is determined (by the Ethernet.h library) based on mi
 
 ## Memory
 
-Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTRA_DIAG in advanced settings.
+Not everything could fit into the limited flash memory of Arduino Nano / Uno. If you have a microcontroller with more memory (such as Mega), you can enable extra settings in the main sketch by defining ENABLE_DHCP and/or ENABLE_EXTENDED_WEBUI in advanced settings.
 
 # Links and Credits
 
