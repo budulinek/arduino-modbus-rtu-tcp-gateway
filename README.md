@@ -97,8 +97,8 @@ You can either:
 Connect your Arduino to ethernet and use your web browser to access the web interface on default IP:  http://192.168.1.254
 Enjoy :-)
 # Settings
-  - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
-  - settings marked \*\* are only available if ENABLE_EXTENDED_WEBUI is defined in the sketch
+  - settings marked \* are only available if ENABLE_DHCP is defined in advanced_settings.h
+  - settings marked \*\* are only available if ENABLE_EXTENDED_WEBUI is defined in advanced_settings.h
 
 ## System Info
 <img src="pics/modbus1.png" alt="modbus1" style="zoom:100%;" />
