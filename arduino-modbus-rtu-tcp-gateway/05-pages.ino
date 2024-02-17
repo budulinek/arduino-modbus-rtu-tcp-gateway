@@ -66,8 +66,10 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   CSS Classes
                     w - wrapper (includes m + c)
                     m  - navigation menu (left)
-                    c - content of a page
-                    r - row inside a content
+                    c - wrapper for the content of a page (incl. smaller header)
+                    d - content of the page
+                    q - row inside a content (top aligned)
+                    r - row inside a content (center-aligned)
                     i - short input (byte or IP address octet)
                     n - input type=number
                     s - select input with numbers
@@ -75,22 +77,25 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   CSS Ids
                     o - checkbox which disables other checkboxes and inputs
                   */
-                  "body,.m{padding:1px;margin:0;font-family:sans-serif}"
+                  "*{box-sizing:border-box}"
+                  "body{padding:1px;margin:0;font-family:sans-serif;height:100vh}"
+                  "body,.w,.c,.q{display:flex}"
+                  "body,.c{flex-flow:column}"
+                  ".w{flex-grow:1;min-height:0}"
+                  ".m{flex:0 0 20vw;padding:1px}"
+                  ".c{flex:1}"
+                  ".d{overflow:auto;padding:15px}"
+                  ".q{padding:1px}"
+                  ".r{align-items:center}"
                   "h1,h4{padding:10px}"
                   "h1,.m,h4{background:#0067AC;margin:1px}"
-                  ".m,.c{height:calc(100vh - 71px)}"
-                  ".m{min-width:20%}"
-                  ".c{flex-grow:1;overflow-y:auto}"
-                  ".w,.r{display:flex}"
                   "a,h1,h4{color:white;text-decoration:none}"
-                  ".c h4{padding-left:30%;margin-bottom:20px}"
-                  ".r{margin:4px}"
+                  ".c h4{padding-left:30%}"
                   "label{width:30%;text-align:right;margin-right:2px}"
-                  "input,button,select{margin-top:-2px}"  // improve vertical allignment of input, button and select
                   ".s{text-align:right}"
                   ".s>option{direction:rtl}"
-                  ".i{text-align:center;width:3ch;color:black}"
-                  ".n{width:8ch}"
+                  ".i{text-align:center;width:4ch;color:black}"
+                  ".n{width:10ch}"
                   "</style>"
                   "</head>"
                   "<body"));
@@ -119,7 +124,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
 
   // Left Menu
   for (byte i = 1; i < PAGE_WAIT; i++) {  // PAGE_WAIT is the last item in enum
-    chunked.print(F("<h4 "));
+    chunked.print(F("<h4"));
     if ((i) == reqPage) {
       chunked.print(F(" style=background-color:#FF6600"));
     }
@@ -134,6 +139,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<h4>"));
   stringPageName(chunked, reqPage);
   chunked.print(F("</h4>"
+                  "<div class=d>"
                   "<form method=post>"));
 
   //   PLACE FUNCTIONS PROVIDING CONTENT HERE
@@ -164,9 +170,10 @@ void sendPage(EthernetClient &client, byte reqPage) {
   }
 
   if (reqPage == PAGE_IP || reqPage == PAGE_TCP || reqPage == PAGE_RTU) {
-    chunked.print(F("<p><div class=r><label><input type=submit value='Save & Apply'></label><input type=reset value=Cancel></div>"));
+    chunked.print(F("<p><div class=q><label><input type=submit value='Save & Apply'></label><input type=reset value=Cancel></div>"));
   }
-  chunked.print(F("</form>"));
+  chunked.print(F("</form>"
+                  "</div>"));
   tagDivClose(chunked);  // close tags <div class=c> <div class=w>
   chunked.end();         // closing tags not required </body></html>
 }
@@ -277,20 +284,22 @@ void contentStatus(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Modbus RTU Response"));
   tagSpan(chunked, JSON_RESPONSE);
   tagDivClose(chunked);
-  tagLabelDiv(chunked, F("Requests Queue"));
+  tagLabelDiv(chunked, F("Requests Queue"), true);
   tagSpan(chunked, JSON_QUEUE);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Statistics"));
   tagButton(chunked, F("Reset Stats"), ACT_RESET_STATS);
-  chunked.print(F("<br>"));
+  tagDivClose(chunked);
+  tagLabelDiv(chunked, 0);
   tagSpan(chunked, JSON_STATS);
   tagDivClose(chunked);
-  tagLabelDiv(chunked, F("Modbus Masters"));
+  tagLabelDiv(chunked, F("Modbus Masters"), true);
   tagSpan(chunked, JSON_TCP_UDP_MASTERS);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("Modbus Slaves"));
   tagButton(chunked, F("Scan Slaves"), ACT_SCAN);
-  chunked.print(F("<br>"));
+  tagDivClose(chunked);
+  tagLabelDiv(chunked, 0);
   tagSpan(chunked, JSON_SLAVES);
   tagDivClose(chunked);
 }
@@ -605,11 +614,16 @@ void tagInputHex(ChunkedPrint &chunked, const byte name, const bool required, co
 
   @param chunked Chunked buffer
   @param label Label string
+  @param top Align to top
 */
 /**************************************************************************/
 void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
-  chunked.print(F("<div class=r>"));
-  chunked.print(F("<label> "));
+  tagLabelDiv(chunked, label, false);
+}
+void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label, bool top) {
+  chunked.print(F("<div class=\"q"));
+  if (!top) chunked.print(F(" r"));
+  chunked.print(F("\"><label> "));
   if (label) {
     chunked.print(label);
     chunked.print(F(":"));
@@ -645,7 +659,7 @@ void tagButton(ChunkedPrint &chunked, const __FlashStringHelper *flashString, by
 /**************************************************************************/
 void tagDivClose(ChunkedPrint &chunked) {
   chunked.print(F("</div>"
-                  "</div>"));  // <div class=r>
+                  "</div>"));  // <div class=q>
 }
 
 /**************************************************************************/

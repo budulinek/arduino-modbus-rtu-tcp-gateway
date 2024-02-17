@@ -25,15 +25,16 @@
   v7.2 2023-10-20 Disable DHCP renewal fallback, better advanced_settings.h layout
                   ENABLE_EXTENDED_WEBUI and ENABLE_DHCP is set by default for Mega
   v7.3 2024-01-16 Bugfix Modbus RTU Request form, code comments
+  v7.4 2024-XX-XX CSS improvement
 */
 
-const byte VERSION[] = { 7, 3 };
+const byte VERSION[] = { 7, 4 };
 
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <utility/w5100.h>
-#include <CircularBuffer.h>  // CircularBuffer https://github.com/rlogiacco/CircularBuffer
+#include <CircularBuffer.hpp>  // CircularBuffer https://github.com/rlogiacco/CircularBuffer
 #include <EEPROM.h>
 #include <StreamLib.h>  // StreamLib https://github.com/jandrassy/StreamLib
 
