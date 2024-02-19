@@ -47,14 +47,16 @@ void sendPage(EthernetClient &client, byte reqPage) {
   chunked.print(F("<!DOCTYPE html>"
                   "<html>"
                   "<head>"
-                  "<meta"));
+                  "<meta charset=utf-8>"
+                  "<meta name=viewport content='width=device-width"));
   if (reqPage == PAGE_WAIT) {  // redirect to new IP and web port
-    chunked.print(F(" http-equiv=refresh content=5;url=http://"));
+    chunked.print(F("'>"
+                    "<meta http-equiv=refresh content='5; url=http://"));
     chunked.print(IPAddress(data.config.ip));
     chunked.print(F(":"));
     chunked.print(data.config.webPort);
   }
-  chunked.print(F(">"
+  chunked.print(F("'>"
                   "<title>Modbus RTU &rArr; Modbus TCP/UDP Gateway</title>"
                   "<style>"
                   /*
@@ -66,10 +68,9 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   CSS Classes
                     w - wrapper (includes m + c)
                     m  - navigation menu (left)
-                    c - wrapper for the content of a page (incl. smaller header)
-                    d - content of the page
-                    q - row inside a content (top aligned)
-                    r - row inside a content (center-aligned)
+                    c - wrapper for the content of a page (incl. smaller header and main)
+                    q - row inside a content (default: top-aligned)
+                    r - row inside a content (adds: center-aligned)
                     i - short input (byte or IP address octet)
                     n - input type=number
                     s - select input with numbers
@@ -82,10 +83,10 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "body,.w,.c,.q{display:flex}"
                   "body,.c{flex-flow:column}"
                   ".w{flex-grow:1;min-height:0}"
-                  ".m{flex:0 0 20vw;padding:1px}"
+                  ".m{flex:0 0 20vw}"
                   ".c{flex:1}"
-                  ".d{overflow:auto;padding:15px}"
-                  ".q{padding:1px}"
+                  ".m,main{overflow:auto;padding:15px}"
+                  ".m,.q{padding:1px}"
                   ".r{align-items:center}"
                   "h1,h4{padding:10px}"
                   "h1,.m,h4{background:#0067AC;margin:1px}"
@@ -139,7 +140,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
                   "<h4>"));
   stringPageName(chunked, reqPage);
   chunked.print(F("</h4>"
-                  "<div class=d>"
+                  "<main>"
                   "<form method=post>"));
 
   //   PLACE FUNCTIONS PROVIDING CONTENT HERE
@@ -173,7 +174,7 @@ void sendPage(EthernetClient &client, byte reqPage) {
     chunked.print(F("<p><div class=q><label><input type=submit value='Save & Apply'></label><input type=reset value=Cancel></div>"));
   }
   chunked.print(F("</form>"
-                  "</div>"));
+                  "</main>"));
   tagDivClose(chunked);  // close tags <div class=c> <div class=w>
   chunked.end();         // closing tags not required </body></html>
 }
@@ -621,9 +622,9 @@ void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label) {
   tagLabelDiv(chunked, label, false);
 }
 void tagLabelDiv(ChunkedPrint &chunked, const __FlashStringHelper *label, bool top) {
-  chunked.print(F("<div class=\"q"));
+  chunked.print(F("<div class='q"));
   if (!top) chunked.print(F(" r"));
-  chunked.print(F("\"><label> "));
+  chunked.print(F("'><label> "));
   if (label) {
     chunked.print(label);
     chunked.print(F(":"));

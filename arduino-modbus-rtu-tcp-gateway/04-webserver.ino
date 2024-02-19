@@ -155,6 +155,7 @@ void recvWeb(EthernetClient &client) {
 
   // Do all actions before the "please wait" redirects (5s delay at the moment)
   if (reqPage == PAGE_WAIT) {
+    delay(500);  // wait for the wait page to load
     switch (action) {
       case ACT_WEB:
         for (byte s = 0; s < maxSockNum; s++) {
