@@ -1,5 +1,5 @@
 # Modbus RTU ⇒ Modbus TCP/UDP Gateway
-Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows you to connect Modbus RTU slaves (such as sensors, energy meters, HVAC devices) to Modbus TCP/UDP masters (such as home automation systems). You can adjust settings through web interface.
+Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Build your own Modbus gateway from off-the-shelf components (Arduino + ethernet shield + TTL to RS485 module). The gateway allows you to connect Modbus RTU slaves (sensors, energy meters, HVAC devices, etc.) to Modbus TCP/UDP masters (such as home automation systems). Once you have your Modbus gateway up and running, you can adjust its settings through web interface.
 
 * [What is it good for?](#what-is-it-good-for)
 * [Technical specifications](#technical-specifications)
@@ -23,7 +23,7 @@ Arduino-based Modbus RTU to Modbus TCP/UDP gateway with web interface. Allows yo
 
 # What is it good for?
 
-Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC devices) to monitoring systems and home automation systems (such as Loxone, Home Assistant, OpenHAB and other). You do not need commercial Modbus gateways. Arduino (with an ethernet shield and a cheap TTL to RS485 module) can do the job! You can easily change settings of your Arduino Modbus gateway via web interface, your settings are automatically stored in EEPROM.
+Allows you to connect your Modbus devices (sensors, energy meters, HVAC devices, etc.) to monitoring systems and home automation systems (such as Loxone, Home Assistant, OpenHAB and other). You do not need commercial Modbus gateways, build your own Modbus gateway from off-the-shelf components (Arduino + ethernet shield + TTL to RS485 module)! Once you have your Modbus gateway up and running, you can easily change its settings via web interface, your settings are automatically stored in EEPROM.
 
 # Technical specifications
 
@@ -60,23 +60,20 @@ Allows you to connect your Modbus devices (such as sensors, energy meters, HVAC 
   - requests to responding slaves are prioritized over requests to non-responding slaves
   - queue size configured in advanced settings (sketch)
 * user settings:
-  - can be changed via web interface (see screenshots bellow)
+  - can be changed via web interface (see screenshots bellow), all web UI inputs have proper validation
   - stored in EEPROM
   - retained during firmware upgrade (only in case of major version change, Arduino loads factory defaults)
-  - all web interface inputs have proper validation
-  - factory defaults for user settings can be specified in advanced_settings.h
-  - settings marked \* are only available if ENABLE_DHCP is defined in the sketch
-  - settings marked \*\* are only available if ENABLE_EXTENDED_WEBUI is defined in the sketch
+  - factory defaults for user settings can be changed in advanced_settings.h
 * advanced settings:
-  - can be changed in sketch (advanced_settings.h)
+  - can be changed in sketch before comnpilation (advanced_settings.h)
   - stored in flash memory
 
 # Hardware
-Get the hardware (cheap clones from China are sufficient) and connect together:
+Get the hardware and connect together:
 
 * **Arduino Nano, Uno or Mega** (and possibly other boards with ATmega chips).<br>On Mega you have to configure Serial in advanced settings in the sketch.
 * **Ethernet shield with WIZnet chip (W5100, W5200 or W5500)**.<br>The ubiquitous W5100 shield for Uno/Mega is sufficient. If available, I recommend W5500 Ethernet Shield. You can also use combo board MCU + ethernet (such as ATmega328 + W5500 board from Keyestudio).<br>ATTENTION: Ethernet shields with ENC28J60 chip will not work !!!
-* **TTL to RS485 module with an automatic flow direction control**.<br>You can buy cheap modules with MAX3485, MAX13487, SP485 or SP3485 chips (some of these modules are branded as "XY-017", "XY-485", "XY-G485", etc.) from Aliexpress and other marketplaces.<br>ATTENTION: Modules with MAX485 chip will work (use pin 6 for DE+RE), but are NOT recommended (no auto-direction, no ESD protection, no hot-swap protection) !!!
+* **TTL to RS485 module with an automatic flow direction control**.<br>You can buy cheap modules with MAX485, MAX3485, MAX13487, SP485 or SP3485 chips (some of these modules are branded as "XY-017", "XY-485", "XY-G485", etc.) from Aliexpress and other marketplaces.<br>ATTENTION: Some TTL module manufacturers invert TX and RX !!! If you experience problems, try to swap TXD and RXD.<br>ATTENTION: Avoid those ubiquitous MAX485 modules with manual direction control (DE and RE pins). They will work (use Arduino pin 6 for DE+RE), but are NOT recommended (no auto-direction, no ESD protection, no hot-swap protection) !!!
 * **External power supply**.<br>Use regulated 5V external power supply for both the Arduino (+ the ethernet shield) and the RS485 module.<br>ATTENTION: By using the 5V pin, you are bypassing Arduino's built-in voltage regulator and reverse-polarity protection curcuit. Make sure your external power supply does not exceed 5,5V !!!
 
 <img src="pics/fritzing.png" alt="fritzing" />
@@ -131,9 +128,9 @@ Enjoy :-)
 * **Slave Responded with Error (Codes 1~8)**. Slave responded, but with an error. For the list of error codes see [Wikipedia](https://en.wikipedia.org/wiki/Modbus#Exception_responses).
 * **Gateway Overloaded (Code 10)**. Request queue is full (either the number of bytes stored or the number of requests stored). Request was dropped and the gateway responded with an error code 10.
 * **Slave Failed to Respond (Code 11)**. Slave is not responding. Response timeouts have passed, all attempts have failed. The gateway responded with an error code 11.
-* **Invalid TCP/UDP Request**. Invalid request was received via TCP or UDP. Request was dropped, no response was sent by the gateway. Validation criteria depends on the Modbus mode:
+* **Invalid TCP/UDP Request**. Invalid request was received via TCP or UDP. Request was dropped, no response was sent by the gateway. Validation criteria depend on the Modbus mode:
   - Modbus TCP/UDP: MBAP header (protocol identifier is 0x0000, length is < 255 and corresponds to the number of bytes in the remainder of the Modbus request)
-  - Modbus RTU over TCP/UDP: CRC ckeck
+  - Modbus RTU over TCP/UDP: CRC check
 * **Invalid RTU Response**. Invalid data were recieved via RS485. Could be caused by wrong Modbus RTU settings, short response timeout (any response arriving after timeout is invalid) or Arduino delays in processing the response. Validation criteria:
   - silence between individual bytes is shorter than char timeout specified in Modbus RTU standards
   - CRC check
@@ -145,13 +142,13 @@ Enjoy :-)
 * **UDP**. Only the last Modbus UDP master is shown, because all UDP masters connect to the same socket.
 * **TCP**. All connected Modbus TCP masters are shown. Each Modbus TCP connection occupies one socket.
 
-**Modbus Slaves**. Shows the slave address (in hex) and the last status (error) for all slaves who responded to a slave scan or who were recipients of a Modbus request.
+**Modbus Slaves**. Shows slave addresses (in hex) and last statuses (errors) for all slaves which responded to a slave scan or which were recipients of a Modbus request.
 
 **Scan Slaves**. An attempt is made to find Modbus RTU slaves connected to the RS485 interface:
   - scan is launched automaticaly after boot or manualy
   - scans all slave addresses 1 - 247
   - dummy requests are sent to each slave address for two different Modbus functions (configured in advanced settings)
-  - fixed response timeout (very short, configured in advanced settings), only one attempt
+  - fixed response timeout is ised (very short, configured in advanced settings), only one attempt is made
   - gateway marks the slave as "Slave Responded" if any response is sent by the slave (even error)
 
 ## IP Settings
@@ -202,7 +199,7 @@ Enjoy :-)
 ## Tools
 <img src="pics/modbus6.png" alt="modbus6" style="zoom:100%;" />
 
-**Load Default Settings**. Loads default settings (see DEFAULT_CONFIG in advanced settings). MAC address is retained.
+**Load Default Settings**. Erases user settings stored in EEPROM (only **EEPROM Health** and **MAC Address** are retained). Loads default settings from flash memory (see DEFAULT_CONFIG in advanced_settings.h).
 
 **Reboot**.
 

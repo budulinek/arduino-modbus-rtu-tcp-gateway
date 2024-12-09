@@ -46,23 +46,26 @@ uint32_t frameDelay() {
 */
 /**************************************************************************/
 void startEthernet() {
-  if (ETH_RESET_PIN != 0) {
-    pinMode(ETH_RESET_PIN, OUTPUT);
-    digitalWrite(ETH_RESET_PIN, LOW);
-    delay(25);
-    digitalWrite(ETH_RESET_PIN, HIGH);
-    delay(ETH_RESET_DELAY);
-  }
+#ifdef ETH_RESET_PIN
+  pinMode(ETH_RESET_PIN, OUTPUT);
+  digitalWrite(ETH_RESET_PIN, LOW);
+  delay(25);
+  digitalWrite(ETH_RESET_PIN, HIGH);
+  delay(ETH_RESET_DELAY);
+#endif
+
 #ifdef ENABLE_DHCP
+  dhcpSuccess = false;
   if (data.config.enableDhcp) {
     dhcpSuccess = Ethernet.begin(data.mac);
   }
-  if (!data.config.enableDhcp || dhcpSuccess == false) {
+  if (!dhcpSuccess) {
     Ethernet.begin(data.mac, data.config.ip, data.config.dns, data.config.gateway, data.config.subnet);
   }
 #else  /* ENABLE_DHCP */
   Ethernet.begin(data.mac, data.config.ip, {}, data.config.gateway, data.config.subnet);  // No DNS
 #endif /* ENABLE_DHCP */
+
   W5100.setRetransmissionTime(TCP_RETRANSMISSION_TIMEOUT);
   W5100.setRetransmissionCount(TCP_RETRANSMISSION_COUNT);
   modbusServer = EthernetServer(data.config.tcpPort);
@@ -100,19 +103,6 @@ void checkEthernet() {
   }
   checkEthTimer.sleep(CHECK_ETH_INTERVAL);
 }
-
-/**************************************************************************/
-/*!
-  @brief Maintains DHCP lease.
-*/
-/**************************************************************************/
-#ifdef ENABLE_DHCP
-void maintainDhcp() {
-  if (data.config.enableDhcp && dhcpSuccess == true) {  // only call maintain if initial DHCP request by startEthernet was successfull
-    Ethernet.maintain();
-  }
-}
-#endif /* ENABLE_DHCP */
 
 /**************************************************************************/
 /*!
