@@ -25,7 +25,7 @@
   v7.2 2023-10-20 Disable DHCP renewal fallback, better advanced_settings.h layout
                   ENABLE_EXTENDED_WEBUI and ENABLE_DHCP is set by default for Mega
   v7.3 2024-01-16 Bugfix Modbus RTU Request form, code comments
-  v7.4 2024-XX-XX CSS improvement, code optimization, simplify DHCP renew
+  v7.4 2024-12-16 CSS improvement, code optimization, simplify DHCP renew, better README (solution to ethernet reset issue)
 */
 
 const byte VERSION[] = { 7, 4 };
