@@ -14,7 +14,7 @@ The problem is poor ethernet shield design. This issue is not specific to cheap 
 
 You can find different solutions on the internet - most of them require soldering additional capacitor (and resistor) to the Arduino Ethernet shield. However, there is much easier and more elegant solution: use SW method to reset / initialize the W5x00 chip.
 
-#### 1. Cut the connection between W5x00's RST pin and Arduino's RST pin.
+### 1. Cut the connection between W5x00's RST pin and Arduino's RST pin.
 
 Keep in mind that there are actually 2 connections between W5x00's RST pin and Arduino's RST pin. You need to cut both of them, simply by bending appropriate pins:
 
@@ -23,11 +23,11 @@ Keep in mind that there are actually 2 connections between W5x00's RST pin and A
 
 <img src="pics/reset_bridges_Ethernet.jpg" alt="HW" style="zoom:100%;" />
 
-#### 2. Connect W5x00's RST pin to an unused Arduino pin 7
+### 2. Connect W5x00's RST pin to an unused Arduino pin 7
 
 Attach the ethernet shield to the Arduino board. Use wire (male/male jumper wire) to connect RESET pin and pin 7 on the Ethernet shield.
 
-#### 3. Reset the W5x00 chip programmatically
+### 3. Reset the W5x00 chip programmatically
 
 Within your Arduino sketch, pull down pin 7 to reset (initialize) the W5x00 chip. Since the HW method to reset the W5x00 chip will no longer work (W5x00 will not reset/initialize automatically after power up), you **++must++** pull down pin 7 before calling Ethernet.begin().
 
