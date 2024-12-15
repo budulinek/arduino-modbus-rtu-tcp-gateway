@@ -1,4 +1,4 @@
-# W5x00 Chip Reset
+# Ethernet Power On Reset Issue
 
 ## Issue
 
@@ -6,7 +6,7 @@ Sometimes Arduino is running fine for days but after power-up or brief loss of p
 
 ## Cause
 
-Arduino ethernet shields use HW method to reset / initialize the W5x00 chip. They have the W5x00's RST pin hard wired to Arduino's RST pin. If Arduino is reset, the W5x00 should be reset also. However, normal reset time of the Arduino is too short. The Arduino microcontroller has a 65 millisecond powerup/reset delay (the longest available to be set by the fuses and bootloader) but the W5x00 chip expects longer pull-down of the RST pin. As a result, the W5x00 chip fails to reset (and initialize) properly.
+Arduino Ethernet shields use HW method to reset (initialize) the W5x00 chip. They have the W5x00's RST pin hard wired to Arduino's RST pin. If Arduino is reset, the W5x00 should be reset also. However, normal reset time of the Arduino is too short. The Arduino microcontroller has a 65 millisecond powerup/reset delay (the longest available to be set by the fuses and bootloader) but the W5x00 chip expects longer pull-down of the RST pin. As a result, the W5x00 chip fails to reset (and initialize) properly.
 
 The problem is poor ethernet shield design. This issue is not specific to cheap ethernet shields (clones), but exists in all variant of the Arduino Ethernet shields.
 
@@ -16,7 +16,7 @@ You can find different solutions on the internet - most of them require solderin
 
 ### 1. Cut the connection between W5x00's RST pin and Arduino's RST pin.
 
-Keep in mind that there are actually 2 connections between W5x00's RST pin and Arduino's RST pin. You need to cut both of them, simply by bending appropriate pins:
+We need to isolate the W5x00's reset signal when the boards are connected together. Keep in mind that there are actually 2 connections between W5x00's RST pin and Arduino's RST pin. You need to cut both of them, simply by bending out or cutting appropriate pins:
 
 - **Bend the RESET pin on the Ethernet shield.**
 - **Bend one pin within the ICSP connector on the Arduino board** (see below)

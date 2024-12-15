@@ -255,7 +255,7 @@ The code was tested on Arduino Nano, Uno and Mega, ethernet chips W5100 and W550
 * The random number generator (for random MAC) is seeded through watch dog timer interrupt - this will work only on Arduino (credits to https://sites.google.com/site/astudyofentropy/project-definition/timer-jitter-entropy-sources/entropy-library/arduino-random-seed)
 * The restart function will also work only on Arduino.
 
-## W5x00 Chip Reset
+## Ethernet Power On Reset Issue
 
 Sometimes the gateway is running fine for days but after power-up or brief loss of power (caused for example by undervoltage), ethernet connection is lost. What is the problem? The W5x00 chip on the Arduino Ethernet Shield is not initialized correctly upon power-up. There is an easy solution to the issue described in a separate [document here](Ethernet_SW_Reset.md).
 
