@@ -1,4 +1,4 @@
-# Limitations and Known Issues
+# W5x00 Chip Reset
 
 ## Issue
 
