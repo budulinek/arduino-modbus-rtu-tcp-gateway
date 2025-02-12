@@ -1,6 +1,8 @@
 /*  Advanced settings, extra functions and default config for Modbus RTU ⇒ Modbus TCP/UDP Gateway
 */
 
+#include "board.h"
+
 /****** FUNCTIONALITY ******/
 
 // #define ENABLE_EXTENDED_WEBUI  // Enable extended Web UI (additional items and settings), consumes FLASH memory
