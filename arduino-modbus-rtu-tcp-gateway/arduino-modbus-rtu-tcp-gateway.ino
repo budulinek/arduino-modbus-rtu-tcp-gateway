@@ -28,8 +28,7 @@
   v7.4 2024-12-16 CSS improvement, code optimization, simplify DHCP renew, better README (solution to ethernet reset issue)
 */
 
-const byte VERSION[] = { 7, 4 };
-
+#include "advanced_settings.h"
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
@@ -42,6 +41,8 @@ const byte VERSION[] = { 7, 4 };
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <util/atomic.h>
+
+const byte VERSION[] = { 7, 4 };
 
 typedef struct {
   byte ip[4];
@@ -62,8 +63,6 @@ typedef struct {
   uint16_t serialTimeout;
   byte serialAttempts;
 } config_t;
-
-#include "advanced_settings.h"
 
 const config_t DEFAULT_CONFIG = {
   DEFAULT_STATIC_IP,
