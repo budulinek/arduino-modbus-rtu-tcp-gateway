@@ -47,8 +47,10 @@ typedef struct {
   byte ip[4];
   byte subnet[4];
   byte gateway[4];
+#ifdef ENABLE_DHCP
   byte dns[4];      // only used if ENABLE_DHCP
   bool enableDhcp;  // only used if ENABLE_DHCP
+#endif
   uint16_t tcpPort;
   uint16_t udpPort;
   uint16_t webPort;
@@ -67,8 +69,10 @@ const config_t DEFAULT_CONFIG = {
   DEFAULT_STATIC_IP,
   DEFAULT_SUBMASK,
   DEFAULT_GATEWAY,
+#ifdef ENABLE_DHCP
   DEFAULT_DNS,
   DEFAULT_AUTO_IP,
+#endif
   DEFAULT_TCP_PORT,
   DEFAULT_UDP_PORT,
   DEFAULT_WEB_PORT,
