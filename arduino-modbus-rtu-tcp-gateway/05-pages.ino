@@ -193,7 +193,7 @@ void contentInfo(ChunkedPrint &chunked) {
   chunked.print(F("."));
   chunked.print(VERSION[1]);
   tagDivClose(chunked);
-  tagLabelDiv(chunked, F("Microcontroller"));
+  tagLabelDiv(chunked, F("Board"));
   chunked.print(BOARD);
   tagDivClose(chunked);
   tagLabelDiv(chunked, F("EEPROM Health"));
