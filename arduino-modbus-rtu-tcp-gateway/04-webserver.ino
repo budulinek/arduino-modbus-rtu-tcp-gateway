@@ -137,12 +137,12 @@ void recvWeb(EthernetClient &client) {
   // Get the requested page from URI
   byte reqPage = PAGE_ERROR;  // requested page, 404 error is a default
   if (uri[0] == '/') {
-    if (uri[1] == '\0')  // the homepage System Info
-      reqPage = PAGE_INFO;
-    else if (!strcmp(uri + 2, ".htm")) {
-      reqPage = byte(uri[1] - 48);  // Convert single ASCII char to byte
-      if (reqPage >= PAGE_WAIT) reqPage = PAGE_ERROR;
-    } else if (!strcmp(uri, "/d.json")) {
+    if (uri[1] == '\0') {
+      reqPage = PAGE_INFO;  // Homepage
+    } else if (uri[1] >= '0' && uri[1] <= '9' && strcmp(uri + 2, ".htm") == 0) {
+      reqPage = byte(uri[1] - '0');  // Convert ASCII digit to byte
+      if (reqPage > PAGE_WAIT) reqPage = PAGE_ERROR;
+    } else if (strcmp(uri, "/d.json") == 0) {
       reqPage = PAGE_DATA;
     }
   }

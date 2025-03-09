@@ -15,10 +15,12 @@ void sendPage(EthernetClient &client, byte reqPage) {
   char webOutBuffer[WEB_OUT_BUFFER_SIZE];
   ChunkedPrint chunked(client, webOutBuffer, sizeof(webOutBuffer));  // the StreamLib object to replace client print
   if (reqPage == PAGE_ERROR) {
-    chunked.print(F("HTTP/1.1 404 Not Found\r\n"
-                    "\r\n"
-                    "404 Not found"));
-    chunked.end();
+    chunked.print(F(
+      "HTTP/1.1 404 Not Found\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: 13\r\n\r\n"
+      "404 Not Found"));
+    chunked.flush();
     return;
   } else if (reqPage == PAGE_DATA) {
     chunked.print(F("HTTP/1.1 200\r\n"  // An advantage of HTTP 1.1 is that you can keep the connection alive
