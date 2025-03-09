@@ -1,6 +1,8 @@
 /*  Advanced settings, extra functions and default config for Modbus RTU ⇒ Modbus TCP/UDP Gateway
 */
 
+#include "board.h"
+
 /****** FUNCTIONALITY ******/
 
 // #define ENABLE_EXTENDED_WEBUI  // Enable extended Web UI (additional items and settings), consumes FLASH memory
@@ -66,7 +68,7 @@ const byte SCAN_DATA_ADDRESS = 0x01;     // Data address sent during Modbus RTU 
 const uint16_t SCAN_TIMEOUT = 200;       // Timeout (ms) for Modbus scan requests
 
 const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };  // MAC range for Gheo SA
-#define ETH_RESET_PIN 7                          // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields) \
+#define ETH_RESET_PIN 7                          // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
                                                  // Comment out to disable the functionality
 const uint16_t CHECK_ETH_INTERVAL = 2000;        // Interval (ms) to check SPI connection with ethernet shield
 const uint16_t ETH_RESET_DELAY = 500;            // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
