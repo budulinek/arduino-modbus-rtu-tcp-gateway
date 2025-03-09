@@ -243,6 +243,16 @@ void contentInfo(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("IP Address"));
   chunked.print(IPAddress(Ethernet.localIP()));
   tagDivClose(chunked);
+}
+
+/**************************************************************************/
+/*!
+  @brief P1P2 Status
+
+  @param chunked Chunked buffer
+*/
+/**************************************************************************/
+void contentStatus(ChunkedPrint &chunked) {
 
 #ifdef ENABLE_EXTENDED_WEBUI
   tagLabelDiv(chunked, F("Run Time"));
@@ -254,17 +264,8 @@ void contentInfo(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Ethernet Data"));
   tagSpan(chunked, JSON_ETH_DATA);
   tagDivClose(chunked);
-#endif
-}
+#endif /* ENABLE_EXTENDED_WEBUI */
 
-/**************************************************************************/
-/*!
-  @brief P1P2 Status
-
-  @param chunked Chunked buffer
-*/
-/**************************************************************************/
-void contentStatus(ChunkedPrint &chunked) {
   tagLabelDiv(chunked, F("Modbus RTU Request"));
   for (byte i = 0; i <= POST_REQ_LAST - POST_REQ; i++) {
     bool required = false;
