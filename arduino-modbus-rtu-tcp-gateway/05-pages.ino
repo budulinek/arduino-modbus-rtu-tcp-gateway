@@ -270,7 +270,7 @@ void contentStatus(ChunkedPrint &chunked) {
   for (byte i = 0; i <= POST_REQ_LAST - POST_REQ; i++) {
     bool required = false;
     bool printVal = false;
-    byte value;
+    byte value = 0;
     if (i == 0 || i == 1) {
       required = true;  // first byte (slave address) and second byte (function code) are required
     }

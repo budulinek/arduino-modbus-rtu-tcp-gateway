@@ -67,7 +67,6 @@ const uint16_t SCAN_TIMEOUT = 200;       // Timeout (ms) for Modbus scan request
 
 const byte MAC_START[3] = { 0x90, 0xA2, 0xDA };  // MAC range for Gheo SA
 #define ETH_RESET_PIN 7                          // Ethernet shield reset pin (deals with power on reset issue on low quality ethernet shields)
-                                                 // Comment out to disable the functionality
 const uint16_t CHECK_ETH_INTERVAL = 2000;        // Interval (ms) to check SPI connection with ethernet shield
 const uint16_t ETH_RESET_DELAY = 500;            // Delay (ms) during Ethernet start, wait for Ethernet shield to start (reset issue on low quality ethernet shields)
 const uint16_t WEB_IDLE_TIMEOUT = 400;           // Time (ms) from last client data after which webserver TCP socket could be disconnected, non-blocking.
