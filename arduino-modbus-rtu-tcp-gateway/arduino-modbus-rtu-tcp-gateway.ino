@@ -26,7 +26,7 @@
                   ENABLE_EXTENDED_WEBUI and ENABLE_DHCP is set by default for Mega
   v7.3 2024-01-16 Bugfix Modbus RTU Request form, code comments
   v7.4 2024-12-16 CSS improvement, code optimization, simplify DHCP renew, better README (solution to ethernet reset issue)
-  v8.0 2025-03-09 Fix 404 error page
+  v8.0 2025-03-09 Fix 404 error page, code optimization
 */
 
 const byte VERSION[] = { 8, 0 };
