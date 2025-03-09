@@ -349,3 +349,79 @@ ISR(WDT_vect) {
   seed1 = seed1 << 8;
   seed1 = seed1 ^ TCNT1L;
 }
+
+// Preprocessor code for identifying microcontroller board
+#if defined(TEENSYDUINO)
+//  --------------- Teensy -----------------
+#if defined(__AVR_ATmega32U4__)
+#define BOARD F("Teensy 2.0")
+#elif defined(__AVR_AT90USB1286__)
+#define BOARD F("Teensy++ 2.0")
+#elif defined(__MK20DX128__)
+#define BOARD F("Teensy 3.0")
+#elif defined(__MK20DX256__)
+#define BOARD F("Teensy 3.2")  // and Teensy 3.1 (obsolete)
+#elif defined(__MKL26Z64__)
+#define BOARD F("Teensy LC")
+#elif defined(__MK64FX512__)
+#define BOARD F("Teensy 3.5")
+#elif defined(__MK66FX1M0__)
+#define BOARD F("Teensy 3.6")
+#else
+#define BOARD F("Unknown Board")
+#endif
+#else  // --------------- Arduino ------------------
+#if defined(ARDUINO_AVR_ADK)
+#define BOARD F("Arduino Mega Adk")
+#elif defined(ARDUINO_AVR_BT)  // Bluetooth
+#define BOARD F("Arduino Bt")
+#elif defined(ARDUINO_AVR_DUEMILANOVE)
+#define BOARD F("Arduino Duemilanove")
+#elif defined(ARDUINO_AVR_ESPLORA)
+#define BOARD F("Arduino Esplora")
+#elif defined(ARDUINO_AVR_ETHERNET)
+#define BOARD F("Arduino Ethernet")
+#elif defined(ARDUINO_AVR_FIO)
+#define BOARD F("Arduino Fio")
+#elif defined(ARDUINO_AVR_GEMMA)
+#define BOARD F("Arduino Gemma")
+#elif defined(ARDUINO_AVR_LEONARDO)
+#define BOARD F("Arduino Leonardo")
+#elif defined(ARDUINO_AVR_LILYPAD)
+#define BOARD F("Arduino Lilypad")
+#elif defined(ARDUINO_AVR_LILYPAD_USB)
+#define BOARD F("Arduino Lilypad Usb")
+#elif defined(ARDUINO_AVR_MEGA)
+#define BOARD F("Arduino Mega")
+#elif defined(ARDUINO_AVR_MEGA2560)
+#define BOARD F("Arduino Mega 2560")
+#elif defined(ARDUINO_AVR_MICRO)
+#define BOARD F("Arduino Micro")
+#elif defined(ARDUINO_AVR_MINI)
+#define BOARD F("Arduino Mini")
+#elif defined(ARDUINO_AVR_NANO)
+#define BOARD F("Arduino Nano")
+#elif defined(ARDUINO_AVR_NG)
+#define BOARD F("Arduino NG")
+#elif defined(ARDUINO_AVR_PRO)
+#define BOARD F("Arduino Pro")
+#elif defined(ARDUINO_AVR_ROBOT_CONTROL)
+#define BOARD F("Arduino Robot Ctrl")
+#elif defined(ARDUINO_AVR_ROBOT_MOTOR)
+#define BOARD F("Arduino Robot Motor")
+#elif defined(ARDUINO_AVR_UNO)
+#define BOARD F("Arduino Uno")
+#elif defined(ARDUINO_AVR_YUN)
+#define BOARD F("Arduino Yun")
+
+// These boards must be installed separately:
+#elif defined(ARDUINO_SAM_DUE)
+#define BOARD F("Arduino Due")
+#elif defined(ARDUINO_SAMD_ZERO)
+#define BOARD F("Arduino Zero")
+#elif defined(ARDUINO_ARC32_TOOLS)
+#define BOARD F("Arduino 101")
+#else
+#define BOARD F("Unknown Board")
+#endif
+#endif
