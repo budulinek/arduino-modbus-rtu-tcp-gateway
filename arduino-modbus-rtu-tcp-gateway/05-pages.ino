@@ -777,6 +777,7 @@ void jsonVal(ChunkedPrint &chunked, const byte JSONKEY) {
             break;
         }
       }
+      break;
     case JSON_ETH_DATA:
       for (byte i = 0; i < DATA_LAST; i++) {
         chunked.print(data.ethCnt[i]);

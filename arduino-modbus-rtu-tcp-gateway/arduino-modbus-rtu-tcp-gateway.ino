@@ -44,6 +44,8 @@ const byte VERSION[] = { 8, 0 };
 #include <avr/wdt.h>
 #include <util/atomic.h>
 
+#include "advanced_settings.h"
+
 typedef struct {
   byte ip[4];
   byte subnet[4];
@@ -63,8 +65,6 @@ typedef struct {
   uint16_t serialTimeout;
   byte serialAttempts;
 } config_t;
-
-#include "advanced_settings.h"
 
 const config_t DEFAULT_CONFIG = {
   DEFAULT_STATIC_IP,
