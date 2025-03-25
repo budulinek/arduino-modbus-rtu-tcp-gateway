@@ -127,7 +127,13 @@ void recvSerial() {
   static byte serialIn[MODBUS_SIZE];
   while (mySerial.available() > 0) {
     byte b = mySerial.read();
-    if (rxNdx < MODBUS_SIZE) {
+    if (rxNdx == 0 && queueData[0] != b) {
+      if(recvMicroTimer.isOver())
+        break;
+      // wait a bit to the buffer to clean up
+      recvMicroTimer.sleep(charTimeOut());  
+    }
+    else if (rxNdx < MODBUS_SIZE) {
       serialIn[rxNdx] = b;
       rxNdx++;
     }  // if frame longer than maximum allowed, CRC will fail and data.errorCnt[ERROR_RTU] will be recorded down the road
