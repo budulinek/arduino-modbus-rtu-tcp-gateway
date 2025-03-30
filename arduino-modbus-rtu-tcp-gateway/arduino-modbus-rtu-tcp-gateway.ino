@@ -27,9 +27,10 @@
   v7.3 2024-01-16 Bugfix Modbus RTU Request form, code comments
   v7.4 2024-12-16 CSS improvement, code optimization, simplify DHCP renew, better README (solution to ethernet reset issue)
   v8.0 2025-03-09 Fix 404 error page, code optimization
+  v8.1 2025-03-30 Read away trash coming before slave id
 */
 
-const byte VERSION[] = { 8, 0 };
+const byte VERSION[] = { 8, 1 };
 
 #include <SPI.h>
 #include <Ethernet.h>
